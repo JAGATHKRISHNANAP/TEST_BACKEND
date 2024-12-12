@@ -1,0 +1,49 @@
+{
+  "companies": [
+    {
+      "company_name": "Tech Solutions Inc.",
+      "revenue": 50000000,
+      "employees": 1200,
+      "region": "North America",
+      "established_year": 2001,
+      "industry": "Technology",
+      "growth_rate": 8.5
+    },
+    {
+      "company_name": "Green Energy Ltd.",
+      "revenue": 30000000,
+      "employees": 850,
+      "region": "Europe",
+      "established_year": 2010,
+      "industry": "Energy",
+      "growth_rate": 12.3
+    },
+    {
+      "company_name": "Foodies Corp.",
+      "revenue": 25000000,
+      "employees": 500,
+      "region": "Asia",
+      "established_year": 2005,
+      "industry": "Food & Beverage",
+      "growth_rate": 6.2
+    },
+    {
+      "company_name": "Global Pharmaceuticals",
+      "revenue": 75000000,
+      "employees": 2200,
+      "region": "North America",
+      "established_year": 1985,
+      "industry": "Pharmaceuticals",
+      "growth_rate": 3.9
+    },
+    {
+      "company_name": "E-commerce Hub",
+      "revenue": 90000000,
+      "employees": 1500,
+      "region": "Europe",
+      "established_year": 2015,
+      "industry": "E-commerce",
+      "growth_rate": 20.1
+    }
+  ]
+}
