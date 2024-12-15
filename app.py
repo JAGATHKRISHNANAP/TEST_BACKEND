@@ -1,7 +1,6 @@
 import os
 from flask_cors import CORS
 import json
-
 from flask import Flask, request, jsonify,session
 from werkzeug.utils import secure_filename
 from excel_upload import upload_excel_to_postgresql
@@ -17,25 +16,14 @@ from audio import allowed_file,transcribe_audio_with_timestamps,save_file_to_db
 from histogram_utils import generate_histogram_details,handle_column_data_types
 from json_upload import upload_json_to_postgresql
 from config import  ALLOWED_EXTENSIONS,DB_NAME,USER_NAME,PASSWORD,HOST,PORT
-
-
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import pandas as pd
 import logging
-
-
-from flask import Flask, request, jsonify, session
 from flask_session import Session  # Flask-Session for server-side session handling
 import uuid
-
-
-
-
-from psycopg2 import sql
 from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data
-import pandas as pd
-from flask import jsonify, request
+
 
 
 company_name_global = None
@@ -168,7 +156,6 @@ def get_columns(table_name):
     column_names = get_column_names(db_nameeee, username, password, table_name, host, port)
     print("column_names====================",column_names)
     return jsonify(column_names)
-
 
 @app.route('/join-tables', methods=['POST'])
 def join_tables():
@@ -367,7 +354,7 @@ def edit_update_category(categories, category_key, y_axis_value, aggregation):
 
 @app.route('/your-backend-endpoint', methods=['POST','GET'])
 def handle_bar_click():
-    # conn = psycopg2.connect("dbname=datasource user=postgres password=jaTHU@12 host=localhost")
+
     conn = connect_to_db()
     cur = conn.cursor()
     data = request.json
@@ -1562,8 +1549,6 @@ def ai_boxPlotChart():
         "histogram_details": details
     })
 
-
-
 # ////////-----------------15-10-2024-----------gayathri------//////////
 
 @app.route('/api/fetch_categories', methods=['GET'])
@@ -1809,10 +1794,6 @@ def get_predictions():
     # prediction_data = load_and_predict(x_axis, y_axis)
     return jsonify(prediction_data)  # Return data as JSON
 
-
-
-
-
 @app.route('/Hierarchial-backend-endpoint', methods=['POST', 'GET'])
 def handle_hierarchical_bar_click():
     global global_df
@@ -1855,9 +1836,6 @@ def handle_hierarchical_bar_click():
         except Exception as e:
             print("An error occurred in handle_hierarchical_bar_click:", str(e))
             return jsonify({"error": "An internal error occurred.", "message": str(e)}), 500
-
-
-
 
 @app.route('/nlp_upload_audio', methods=['POST'])
 def nlp_upload_audio():
@@ -1927,6 +1905,25 @@ def upload_file_json():
         traceback.print_exc()
         return jsonify({'message': f"Internal Server Error: {str(e)}"}), 500
 
+@app.route('/api/employees', methods=['GET'])
+def get_employees():
+    company = request.args.get('company')  # Get company name from query parameter
+    print("comapnay",company)
+    if not company:
+        return jsonify({"error": "Company parameter is missing"}), 400
+
+    conn = get_company_db_connection(company)  # Assuming `get_db_connection` is a function to connect to your database
+    cur = conn.cursor()
+    cur.execute('SELECT employee_id, employee_name FROM employee_list ')
+    employees = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    # Format the employee data into a list of dictionaries
+    employee_list = [{'employee_id': emp[0], 'employee_name': emp[1]} for emp in employees]
+    print(employee_list)  # Optionally, log the employee list for debugging purposes
+
+    return jsonify(employee_list)
 
 
 

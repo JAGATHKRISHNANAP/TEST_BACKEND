@@ -539,6 +539,7 @@ def get_dashboard_view_chart_data(chart_ids):
                     # Proceed with category and value generation for non-singleValueChart types
                     connection = get_db_connection_view(database_name)
                     dataframe = fetch_chart_data(connection, table_name)
+                    
                     print("Chart ID", chart_id)
                     print("Chart Type", chart_type)
 
@@ -553,7 +554,14 @@ def get_dashboard_view_chart_data(chart_ids):
 
                     # Check if the aggregation type is count
                     if aggregate_py == 'count':
-                        grouped_df = dataframe.groupby(x_axis).size().reset_index(name="count")
+                        print("Aggregate is count", aggregate_py)
+                        print("X-Axis:", x_axis)
+                        
+                        df=fetch_chart_data(connection, table_name)
+                        print("dataframe---------",df.head(5))
+
+                        grouped_df = df.groupby(x_axis[0]).size().reset_index(name="count")
+                        print("grouped_df---------",grouped_df)
                         print("Grouped DataFrame (count):", grouped_df.head())
 
                         categories = grouped_df[x_axis[0]].tolist()

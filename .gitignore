@@ -1,4 +1,5 @@
 /venv
+/tmp
 /flask_session
 /line_plot.py
 /scatter_plot.py
