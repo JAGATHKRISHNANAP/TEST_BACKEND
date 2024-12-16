@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 import psycopg2
 import bcrypt
 import logging
+import binascii
+
 from config import PASSWORD, USER_NAME, HOST, PORT
 
 def get_db_connection(dbname="datasource"):
@@ -130,47 +132,6 @@ def fetch_login_data(email, password):
     return { "user": user}
 
 
-
-import binascii
-import bcrypt
-# def fetch_company_login_data(email, password, company):
-#     conn = connect_db(company)
-#     cursor = conn.cursor()
-
-#     # First query to fetch the user details (except password)
-#     cursor.execute("SELECT employee_id, employee_name, role_id, email FROM employee_list WHERE email = %s", (email,))
-#     user = cursor.fetchone()
-
-#     if user:
-#         # Second query to fetch the hashed password separately
-#         cursor.execute("SELECT password FROM employee_list WHERE email = %s", (email,))
-#         hashed_password_row = cursor.fetchone()
-
-#         if hashed_password_row:
-#             stored_hash_with_hex = hashed_password_row[0]  # Get the password from the result
-#             stored_hash_bytes = binascii.unhexlify(stored_hash_with_hex.replace('\\x', ''))
-
-#             # Check if the password matches the hashed password
-#             if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
-#                 print("Password match!")
-#                 cursor.close()
-#                 conn.close()
-#                 return user  # Return the user details (without the password)
-#             else:
-#                 print("Password does not match!")
-#         else:
-#             print("Password not found!")
-
-#     else:
-#         print("User not found!")
-
-#     cursor.close()
-#     conn.close()
-#     return None
-
-import binascii
-import bcrypt
-
 def fetch_company_login_data(email, password, company):
     conn = connect_db(company)
     cursor = conn.cursor()
@@ -272,6 +233,36 @@ def fetch_role_id_data():
 #     except Exception as e:
 #         print(f"Error creating table: {e}")
 
+
+def create_user_table_if_not_exists(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS "user" (
+            id SERIAL PRIMARY KEY, 
+            company_id INT NOT NULL,  -- Changed the column order to include company_id first
+            user_id INT NOT NULL, 
+            role_id INT NOT NULL, 
+            category_id INT NOT NULL, 
+            FOREIGN KEY (role_id) REFERENCES role(role_id),
+            FOREIGN KEY (company_id) REFERENCES organizationdatatest(id),
+            FOREIGN KEY (category_id) REFERENCES category(category_id)
+        );
+    """)
+
+
+def create_category_table_if_not_exists(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS category (
+            category_id SERIAL PRIMARY KEY,
+            category_name VARCHAR(255) NOT NULL,
+            company_id INT NOT NULL,
+            FOREIGN KEY (company_id) REFERENCES organizationdatatest(id) ON DELETE CASCADE
+        );
+    """)
+   
+
+
+
+
 def create_user_table(conn):
     try:
         with conn.cursor() as cursor:
@@ -292,6 +283,7 @@ def create_user_table(conn):
         conn.commit()
     except Exception as e:
         print(f"Error creating table: {e}")
+
 
 
 

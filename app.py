@@ -23,6 +23,7 @@ import logging
 from flask_session import Session  # Flask-Session for server-side session handling
 import uuid
 from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data
+from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
 
 
 
@@ -1219,8 +1220,8 @@ def saved_dashboard_names():
         return jsonify({'error': 'Failed to fetch chart names'})
 
 
-@app.route('/api/usersignup', methods=['POST'])
-def usersignup():
+# @app.route('/api/usersignup', methods=['POST'])
+# def usersignup():
     data = request.json
     print("Received Data:", data)
 
@@ -1467,6 +1468,25 @@ def usersignup():
                 conn_datasource.close()
 
         return jsonify({'message': 'File upload processed successfully'}), 200
+
+
+@app.route('/api/usersignup', methods=['POST'])
+def usersignup():
+    data = request.json
+    print("Received Data:", data)
+
+    register_type = data.get("registerType")
+    print("Register Type:", register_type)
+
+    user_details = data.get("userDetails")
+    print("User Details:", user_details)
+
+    if register_type == "manual":
+        return handle_manual_registration(user_details)
+    elif register_type == "File_Upload":
+        return handle_file_upload_registration(user_details)
+
+    return jsonify({'message': 'Invalid registration type'}), 400
 
 def get_db_connection(dbname="datasource"):
     conn = psycopg2.connect(
@@ -1930,7 +1950,7 @@ def get_employees():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=80)
+    app.run(debug=True, host='0.0.0.0', port=5000)
     # app.run(debug=True)
 
 
