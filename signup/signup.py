@@ -263,6 +263,27 @@ def create_category_table_if_not_exists(cursor):
 
 
 
+# def create_user_table(conn):
+#     try:
+#         with conn.cursor() as cursor:
+#             cursor.execute("""
+#                 CREATE TABLE IF NOT EXISTS employee_list (
+#                     employee_id SERIAL PRIMARY KEY,
+#                     employee_name VARCHAR(255),
+#                     role_id VARCHAR(255),
+#                     username varchar(255),     
+#                     email VARCHAR(255),
+#                     password VARCHAR(255),
+#                     category varchar(255),
+#                     action_type varchar(255), 
+#                     action_by varchar(255)
+                    
+#                 );
+#             """)
+#         conn.commit()
+#     except Exception as e:
+#         print(f"Error creating table: {e}")
+
 def create_user_table(conn):
     try:
         with conn.cursor() as cursor:
@@ -271,12 +292,13 @@ def create_user_table(conn):
                     employee_id SERIAL PRIMARY KEY,
                     employee_name VARCHAR(255),
                     role_id VARCHAR(255),
-                    username varchar(255),     
+                    username VARCHAR(255),
                     email VARCHAR(255),
                     password VARCHAR(255),
-                    category varchar(255),
-                    action_type varchar(255), 
-                    action_by varchar(255)
+                    category VARCHAR(255),
+                    action_type VARCHAR(255),
+                    action_by VARCHAR(255),
+                    reporting_id INTEGER
                     
                 );
             """)
