@@ -24,7 +24,7 @@ def create_dashboard_table(conn):
     create_table_query = """
     CREATE TABLE IF NOT EXISTS dashboard_details_WU_ID (
         id SERIAL PRIMARY KEY,
-        user_id VARCHAR(255), 
+        user_id INTEGER,
         company_name VARCHAR(255),  
         file_name VARCHAR(255), 
         chart_ids VARCHAR(255),

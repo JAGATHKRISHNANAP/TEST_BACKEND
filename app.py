@@ -413,7 +413,7 @@ def create_table():
         cur.execute("""
             CREATE TABLE IF NOT EXISTS new_dashboard_details_new (
                 id SERIAL PRIMARY KEY,
-                User_id VARCHAR,
+                User_id INTEGER, 
                 company_name VARCHAR,
                 chart_name VARCHAR,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
