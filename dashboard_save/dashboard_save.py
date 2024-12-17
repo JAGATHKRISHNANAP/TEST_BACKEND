@@ -78,13 +78,13 @@ def insert_combined_chart_details(conn, combined_chart_details):
 
 
 
-def get_dashboard_names(company_name_global):
+def get_dashboard_names(user_id,company_name_global):
     conn = create_connection()
     if conn:
         try:
             cursor = conn.cursor()
-            query = ("SELECT file_name FROM dashboard_details_wu_id WHERE company_name = %s")
-            cursor.execute(query, (company_name_global,))
+            query = ("SELECT file_name FROM dashboard_details_wu_id WHERE company_name = %s AND user_id = %s ")
+            cursor.execute(query, (company_name_global,user_id))
             chart_names = [row[0] for row in cursor.fetchall()]
             cursor.close()
             conn.close()

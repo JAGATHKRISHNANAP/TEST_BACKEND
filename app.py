@@ -554,36 +554,197 @@ def connect_to_db():
         print("Error connecting to the database:", e)
         return None
 
-def get_chart_names(company_name_global):
-    conn = connect_to_db()
-    if conn:
+# def get_chart_names(company_name_global):
+#     conn = connect_to_db()
+#     if conn:
+#         try:
+#             cursor = conn.cursor()
+#             query = "SELECT chart_name FROM new_dashboard_details_new WHERE company_name = %s"
+#             cursor.execute(query, (company_name_global,))
+#             chart_names = [row[0] for row in cursor.fetchall()]
+#             cursor.close()
+#             conn.close()
+#             print("chart_names", chart_names)
+#             return chart_names
+#         except psycopg2.Error as e:
+#             print("Error fetching chart names:", e)
+#             conn.close()
+#             return None
+#     else:
+#         return None
+
+
+# def get_chart_names(user_id, company_name_global):
+#     # Step 1: Get employees reporting to the given user_id from the company database.
+#     conn_company = get_company_db_connection(company_name_global)
+#     # print("company_name_global====================",conn_company)
+#     reporting_employees = []
+
+#     if conn_company:
+#         try:
+#             with conn_company.cursor() as cursor:
+#                 # Check if reporting_id column exists dynamically (skip errors if missing).
+#                 cursor.execute("""
+#                     SELECT column_name FROM information_schema.columns 
+#                     WHERE table_name='employee_list' AND column_name='reporting_id'
+#                 """)
+#                 column_exists = cursor.fetchone()
+
+#                 if column_exists:
+#                     # Fetch employees who report to the given user_id (including NULL reporting_id if not assigned).
+#                     cursor.execute("""
+#                         SELECT employee_id FROM employee_list WHERE reporting_id = %s OR reporting_id IS NULL
+#                     """, (user_id,))
+#                     reporting_employees = [row[0] for row in cursor.fetchall()]
+#                     print(f"Reporting employees: {reporting_employees}")
+
+#         except psycopg2.Error as e:
+#             print(f"Error fetching reporting employees: {e}")
+#         finally:
+#             conn_company.close()
+
+#     # Include the user's own employee_id for fetching their charts.
+#     # Convert all IDs to integers for consistent data type handling.
+#     all_employee_ids = list(map(int, reporting_employees)) + [int(user_id)]
+
+#     # Step 2: Fetch dashboard names for these employees from the datasource database.
+#     conn_datasource = get_db_connection("datasource")
+#     dashboard_structure = {}
+
+#     if conn_datasource:
+#         try:
+#             with conn_datasource.cursor() as cursor:
+#                 # Create placeholders for the IN clause
+#                 placeholders = ', '.join(['%s'] * len(all_employee_ids))
+                
+#                 # Updated query to use placeholders for company_name
+#                 query = f"""
+#                     SELECT user_id, chart_name FROM new_dashboard_details_new
+#                     WHERE user_id IN ({placeholders}) AND company_name = %s
+#                 """
+#                 cursor.execute(query, tuple(all_employee_ids) + (company_name_global,))
+#                 charts = cursor.fetchall()
+
+#                 # Organize charts by user_id
+#                 for uid, chart_name in charts:
+#                     if uid not in dashboard_structure:
+#                         dashboard_structure[uid] = []
+#                     dashboard_structure[uid].append(chart_name)
+#         except psycopg2.Error as e:
+#             print(f"Error fetching dashboard details: {e}")
+#         finally:
+#             conn_datasource.close()
+
+#     return dashboard_structure
+
+
+
+
+
+
+def get_chart_names(user_id, company_name_global):
+    # Step 1: Get employees reporting to the given user_id from the company database.
+    conn_company = get_company_db_connection(company_name_global)
+    # print("company_name_global====================",conn_company)
+    reporting_employees = []
+
+    if conn_company:
         try:
-            cursor = conn.cursor()
-            query = "SELECT chart_name FROM new_dashboard_details_new WHERE company_name = %s"
-            cursor.execute(query, (company_name_global,))
-            chart_names = [row[0] for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
-            print("chart_names", chart_names)
-            return chart_names
+            with conn_company.cursor() as cursor:
+                # Fetch all details from the employee_list table
+                cursor.execute("SELECT employee_id, reporting_id FROM employee_list")
+                table_data = cursor.fetchall()  # Fetch all rows
+                print("Table data:", table_data)
+                
+                # Filter and print employee_id where reporting_id matches user_id
+                for row in table_data:
+                    employee_id, reporting_id = row
+                    if reporting_id == user_id:
+                        reporting_employees.append(employee_id)
+                        print(f"Employee ID reporting to User ID {user_id}: {employee_id}")
+                    else:
+                        print(f"user id not match to reporting id")
+                
+                print(f"Reporting employees: {reporting_employees}")
+
         except psycopg2.Error as e:
-            print("Error fetching chart names:", e)
-            conn.close()
-            return None
-    else:
-        return None
+            print(f"Error fetching table details: {e}")
+        finally:
+            conn_company.close()
+
+    # Include the user's own employee_id for fetching their charts.
+    # Convert all IDs to integers for consistent data type handling.
+    all_employee_ids = list(map(int, reporting_employees)) + [int(user_id)]
+
+    # Step 2: Fetch dashboard names for these employees from the datasource database.
+    conn_datasource = get_db_connection("datasource")
+    dashboard_structure = {}
+
+    if conn_datasource:
+        try:
+            with conn_datasource.cursor() as cursor:
+                # Create placeholders for the IN clause
+                placeholders = ', '.join(['%s'] * len(all_employee_ids))
+                
+                # Updated query to use placeholders for company_name
+                query = f"""
+                    SELECT user_id, chart_name FROM new_dashboard_details_new
+                    WHERE user_id IN ({placeholders}) AND company_name = %s
+                """
+                cursor.execute(query, tuple(all_employee_ids) + (company_name_global,))
+                charts = cursor.fetchall()
+
+                # Organize charts by user_id
+                for uid, chart_name in charts:
+                    if uid not in dashboard_structure:
+                        dashboard_structure[uid] = []
+                    dashboard_structure[uid].append(chart_name)
+        except psycopg2.Error as e:
+            print(f"Error fetching dashboard details: {e}")
+        finally:
+            conn_datasource.close()
+
+    return dashboard_structure
+
+
+
+
+
+
+
+
+# @app.route('/total_rows', methods=['GET'])
+# def chart_names():
+#     global company_name_global
+#     print("company_name====================",company_name_global)  
+    
+#     names = get_chart_names(company_name_global)
+#     print("names====================", names)   
+#     if names is not None:
+#         return jsonify({'chart_names': names})
+#     else:
+#         return jsonify({'error': 'Failed to fetch chart names'})
+
 
 @app.route('/total_rows', methods=['GET'])
 def chart_names():
     global company_name_global
-    print("company_name====================",company_name_global)  
-    
-    names = get_chart_names(company_name_global)
+    user_id = request.args.get('user_id')
+    print("company_name_global====================", company_name_global)
+    print("user_id====================", user_id)  
+
+    try:
+        user_id = int(user_id)  # Convert to integer
+    except ValueError:
+        return jsonify({'error': 'Invalid user_id. Must be an integer.'})
+
+    names = get_chart_names(user_id, company_name_global)
     print("names====================", names)   
     if names is not None:
         return jsonify({'chart_names': names})
     else:
         return jsonify({'error': 'Failed to fetch chart names'})
+
 
 def get_chart_data(chart_name):
     print("chart_id====================......................................................",chart_name)
@@ -1212,7 +1373,8 @@ def dashboard_data(dashboard_name):
 @app.route('/saved_dashboard_total_rows', methods=['GET'])
 def saved_dashboard_names():
     global company_name_global
-    names = get_dashboard_names(company_name_global)
+    user_id = request.args.get('user_id')
+    names = get_dashboard_names(user_id,company_name_global)
     print("names====================", names)   
     if names is not None:
         return jsonify({'chart_names': names})
@@ -1946,7 +2108,150 @@ def get_employees():
     return jsonify(employee_list)
 
 
+
+
+
+
 # test
+from psycopg2.extras import RealDictCursor
+
+
+@app.route('/delete-chart', methods=['DELETE'])
+def delete_dashboard_name():
+    chart_name = request.json.get('chart_name')  # Get the chart_name from JSON body
+    
+    if not chart_name:
+        return jsonify({"error": "Chart name is required"}), 400
+    
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Failed to connect to the database"}), 500
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("DELETE FROM dashboard_details_wu_id WHERE file_name = %s", (chart_name,))
+        rows_deleted = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        if rows_deleted == 0:
+            return jsonify({"message": f"No chart found with the name '{chart_name}'"}), 404
+
+        return jsonify({"message": f"Chart '{chart_name}' deleted successfully"}), 200
+    
+    except Exception as e:
+        print("Error while deleting chart:", e)
+        return jsonify({"error": "Failed to delete chart"}), 500
+
+
+@app.route('/api/charts/<string:chart_name>', methods=['DELETE'])
+def delete_chart(chart_name):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Failed to connect to the database"}), 500
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Delete the chart from the table
+        cur.execute("DELETE FROM new_dashboard_details_new WHERE chart_name = %s", (chart_name,))
+        rows_deleted = cur.rowcount
+        
+        # Commit changes and close the connection
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # If no rows were deleted, return a 404 error
+        if rows_deleted == 0:
+            return jsonify({"message": f"No chart found with the name '{chart_name}'"}), 404
+
+        return jsonify({"message": f"Chart '{chart_name}' deleted successfully"}), 200
+    
+    except Exception as e:
+        print("Error while deleting chart:", e)
+        return jsonify({"error": "Failed to delete chart"}), 500
+
+
+@app.route('/api/is-chart-in-dashboard', methods=['GET'])
+def is_chart_in_dashboard():
+    chart_name = request.args.get('chart_name')
+    
+    if not chart_name:
+        return jsonify({"error": "Chart name is required"}), 400
+
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Failed to connect to the database"}), 500
+
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Fetch data using subquery for chart_id
+        cur.execute("""
+            SELECT * 
+FROM dashboard_details_wu_id 
+WHERE 
+    (SELECT id FROM new_dashboard_details_new WHERE chart_name = %s)::INTEGER 
+    = ANY(string_to_array(trim(BOTH '{}' FROM chart_ids), ',')::INTEGER[])
+
+        """, (chart_name,))
+        
+        chart_in_dashboard = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if chart_in_dashboard:
+            return jsonify({
+                "isInDashboard": True,
+                "message": f"Chart '{chart_name}' is being used in a dashboard."
+            }), 200
+        else:
+            return jsonify({
+                "isInDashboard": False,
+                "message": f"Chart '{chart_name}' is not being used in a dashboard."
+            }), 200
+
+    except Exception as e:
+        print("Error checking chart usage:", e)
+        return jsonify({"error": "Failed to check if chart is used"}), 500
+    
+
+       
+@app.route('/api/checkTableUsage', methods=['GET'])
+def check_table_usage():
+    table_name = request.args.get('tableName')
+
+    if not table_name:
+        return jsonify({"error": "Table name is required"}), 400
+
+    # Remove any surrounding quotes from the table name
+    table_name = table_name.strip('"').strip("'")
+
+    # Debugging: Print the received table name
+    print(f"Received table name: {table_name}")
+
+    # Check if the table is used for chart creation
+    is_in_use = is_table_used_in_charts(table_name)
+    print("is_in_use",is_in_use)
+    return jsonify({"isInUse": is_in_use})
+
+# Function to check if a table is used in chart creation
+def is_table_used_in_charts( table_name):
+    conn = get_db_connection(dbname="datasource")
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT EXISTS (
+            SELECT 1 FROM new_dashboard_details_new WHERE selected_table = %s
+        )
+        """,
+        (table_name,)
+    )
+    return cur.fetchone()[0]
+
+
+# PUSH DATE 17-12-2024
 
 
 if __name__ == "__main__":

@@ -52,6 +52,7 @@ def handle_manual_registration(user_details):
             return jsonify({'message': f'Failed to connect to company database for {organization_name}'}), 500
         try:
             with conn_datasource.cursor() as cursor:
+                create_user_table(conn)
                 create_category_table_if_not_exists(cursor)
                 create_user_table_if_not_exists(cursor)
                 conn_datasource.commit()  # Commit the creation to persist changes
@@ -241,7 +242,7 @@ def create_user_table(conn):
         conn.commit()
     except Exception as e:
         print(f"Error creating table: {e}")
-        
+
 def create_user_table_if_not_exists(cursor):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS "user" (
