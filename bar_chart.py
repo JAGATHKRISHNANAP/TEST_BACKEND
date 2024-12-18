@@ -296,31 +296,89 @@ def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):
 
 
 
-def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column,aggregation,db_nameeee):
+# def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column,aggregation,db_nameeee):
+#     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
+#     cur = conn.cursor()
+#     if aggregation == "sum":
+#         aggregation = "SUM"
+#     elif aggregation == "average":
+#         aggregation = "AVG"
+#     elif aggregation == "count":
+#         aggregation = "COUNT"
+#     elif aggregation == "maximum":
+#         aggregation = "MAX"
+#     elif aggregation == "minimum":
+#         aggregation = "MIN"
+        
+#     x_axis_columns_str = ', '.join(f'"{column}"' for column in x_axis_columns)
+#     options = [option.strip() for option in checked_option.split(',')]
+#     placeholders = ','.join(['%s' for _ in options])
+#     query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
+
+#     print("Constructed Query:", cur.mogrify(query, options).decode('utf-8'))
+#     cur.execute(query,options)
+#     rows = cur.fetchall()
+#     cur.close()
+#     conn.close()
+#     return rows
+def fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_nameeee):
+    # Establish the database connection
     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     cur = conn.cursor()
+
+    # Handle aggregation mappings
+    aggregation = aggregation.lower()
     if aggregation == "sum":
-        aggregation = "SUM"
+        aggregation_function = "SUM"
     elif aggregation == "average":
-        aggregation = "AVG"
-    elif aggregation == "count":
-        aggregation = "COUNT"
+        aggregation_function = "AVG"
     elif aggregation == "maximum":
-        aggregation = "MAX"
+        aggregation_function = "MAX"
     elif aggregation == "minimum":
-        aggregation = "MIN"
-        
+        aggregation_function = "MIN"
+    elif aggregation == "count":
+        aggregation_function = "COUNT"
+    else:
+        raise ValueError("Invalid aggregation type specified.")
+
+    # Format the x-axis column string and prepare the checked options
     x_axis_columns_str = ', '.join(f'"{column}"' for column in x_axis_columns)
     options = [option.strip() for option in checked_option.split(',')]
-    placeholders = ','.join(['%s' for _ in options])
-    query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
+    placeholders = ', '.join(['%s'] * len(options))
 
+    # Separate queries for count and other aggregations
+    if aggregation == "count":
+        query = f"""
+            SELECT {x_axis_columns[0]}, COUNT("{y_axis_column[0]}") AS count_{y_axis_column[0]},
+            COUNT("{y_axis_column[1]}") AS count_{y_axis_column[1]}
+            FROM {table_name}
+            WHERE {x_axis_columns[0]} IN ({placeholders})
+            GROUP BY {x_axis_columns_str}
+        """
+    else:
+        query = f"""
+            SELECT {x_axis_columns[0]}, 
+                   {aggregation_function}("{y_axis_column[0]}"::numeric) AS {y_axis_column[0]},
+                   {aggregation_function}("{y_axis_column[1]}"::numeric) AS {y_axis_column[1]}
+            FROM {table_name}
+            WHERE {x_axis_columns[0]} IN ({placeholders})
+            GROUP BY {x_axis_columns_str}
+        """
+
+    # Log the constructed query for debugging
     print("Constructed Query:", cur.mogrify(query, options).decode('utf-8'))
-    cur.execute(query,options)
+
+    # Execute the query and fetch results
+    cur.execute(query, options)
     rows = cur.fetchall()
+
+    # Close the cursor and connection
     cur.close()
     conn.close()
+    print("rows", rows)
+
     return rows
+
 
 def fetch_column_name(table_name, x_axis_columns,db_nameeee):
     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
@@ -376,18 +434,12 @@ def perform_calculation(dataframe, columnName, calculation):
     global_df = dataframe   
     return global_df
 
-def fetchText_data(databaseName, table_Name, x_axis, aggregate):
-    print("aggregate===========================>>>>", aggregate)   
+
+
+def fetchText_data(databaseName, table_Name, x_axis, aggregate_py):
+    print("aggregate===========================>>>>", aggregate_py)   
     print(table_Name)
 
-    aggregate_sql = {
-        'count': 'COUNT',
-        'sum': 'SUM',
-        'average': 'AVG',
-        'minimum': 'MIN',
-        'maximum': 'MAX',
-        'variance': 'VARIANCE',
-    }.get(aggregate, 'SUM') 
 
     # Connect to the database
     conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
@@ -405,12 +457,13 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate):
     # Use DISTINCT only if the column type is character varying
     if column_type == 'character varying':
         query = f"""
-        SELECT {aggregate_sql}(DISTINCT {x_axis}) AS total_{x_axis}
+        SELECT {aggregate_py}(DISTINCT {x_axis}) AS total_{x_axis}
         FROM {table_Name}
         """
+        print("character varying")  
     else:
         query = f"""
-        SELECT {aggregate_sql}({x_axis}) AS total_{x_axis}
+        SELECT {aggregate_py}({x_axis}) AS total_{x_axis}
         FROM {table_Name}
         """
 

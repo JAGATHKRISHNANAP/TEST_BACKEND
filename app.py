@@ -1022,7 +1022,7 @@ def receive_single_value_chart_data():
     chart_id=data.get('chart_id')
     x_axis = data.get('text_y_xis')[0]
     databaseName = data.get('text_y_database')
-    table_Name = data.get('text_y_table')[0]
+    table_Name = data.get('text_y_table')
     print("table_Name====================",table_Name)
     aggregate=data.get('text_y_aggregate')
     print("x_axis====================",x_axis)  
