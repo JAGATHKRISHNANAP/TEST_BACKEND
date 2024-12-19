@@ -409,8 +409,10 @@ def get_filter_options(selectedTable, columnName):
     table_name=selectedTable
     column_name=columnName
     db_nameeee= request.args.get('databaseName')
+    xAxis = request.args.getlist('xAxis[]')  # Use getlist() to retrieve all values
+    print("xAxis====================",xAxis)
     print("db_nameeee====================",db_nameeee)
-    column_data=fetch_column_name(table_name, column_name, db_nameeee)
+    column_data=fetch_column_name(table_name, column_name, db_nameeee,xAxis)
     print("column_data====================",column_data)
     return jsonify(column_data)
 

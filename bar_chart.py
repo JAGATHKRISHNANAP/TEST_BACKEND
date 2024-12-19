@@ -380,16 +380,35 @@ def fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_colum
     return rows
 
 
-def fetch_column_name(table_name, x_axis_columns,db_nameeee):
+# def fetch_column_name(table_name, x_axis_columns,db_nameeee,xAxis):
+#     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
+#     cur = conn.cursor()
+#     # for i in range(len(x_axis_columns)):
+#     query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
+#     cur.execute(query)
+#     rows = cur.fetchall()
+#     cur.close()
+#     conn.close()
+#     return rows
+
+
+def fetch_column_name(table_name, x_axis_columns, db_nameeee, xAxis):
     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     cur = conn.cursor()
-    # for i in range(len(x_axis_columns)):
-    query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
-    cur.execute(query)
-    rows = cur.fetchall()
+    # result_array = []  # Initialize an array to store the results
+    
+    if x_axis_columns in xAxis:  # Check if x_axis_columns is in xAxis
+        query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
+        cur.execute(query)
+        rows = cur.fetchall()
+        # Append the column name and its data as a dictionary
+        # result_array.append({x_axis_columns: rows})
+    
     cur.close()
     conn.close()
+    # print("result_array", result_array)
     return rows
+
 
 
 
