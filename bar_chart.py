@@ -267,7 +267,7 @@ def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):
         return []
     print(global_df)
     # print("-----------------------------------------------------------------------------------------------------------------------------------------------------",y_axis_column[0])
-    global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+    # global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
     if aggregation == "SUM":
         aggregation_func = "sum"
     elif aggregation == "AVG":
@@ -287,7 +287,7 @@ def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):
     else:
         print("Not enough columns in x_axis_columns for drill down.")
         return []
-
+    # global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
     grouped_df = filtered_df.groupby(target_column).agg({y_axis_column[0]: aggregation_func}).reset_index()
     result = [tuple(x) for x in grouped_df.to_numpy()]
     

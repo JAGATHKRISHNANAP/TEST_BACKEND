@@ -24,6 +24,7 @@ from flask_session import Session  # Flask-Session for server-side session handl
 import uuid
 from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data
 from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
+from ai_charts import analyze_data
 
 
 
@@ -157,6 +158,14 @@ def get_columns(table_name):
     column_names = get_column_names(db_nameeee, username, password, table_name, host, port)
     print("column_names====================",column_names)
     return jsonify(column_names)
+
+
+@app.route('/ai_ml_chartdata', methods=['GET'])
+def ai_ml_charts():
+    dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
+    ai_ml_charts_details = analyze_data(dataframe)
+    print("ai_ml_charts_details====================", ai_ml_charts_details)
+    return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
 
 @app.route('/join-tables', methods=['POST'])
 def join_tables():
