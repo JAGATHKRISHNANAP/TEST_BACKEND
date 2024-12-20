@@ -16,11 +16,9 @@ for sub_folder in SUB_FOLDERS:
     folder_path = os.path.join(UPLOAD_FOLDER, sub_folder)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
-
-
 DB_NAME = 'datasource'
 USER_NAME = 'postgres'
-PASSWORD = 'jaTHU@12'
+PASSWORD ='Gayu@123'
 HOST = 'localhost'
 # HOST = 'host.docker.internal'
 

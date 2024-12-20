@@ -24,7 +24,7 @@ def create_dashboard_table(conn):
     create_table_query = """
     CREATE TABLE IF NOT EXISTS dashboard_details_WU_ID (
         id SERIAL PRIMARY KEY,
-        user_id VARCHAR(255), 
+        user_id integer, 
         company_name VARCHAR(255),  
         file_name VARCHAR(255), 
         chart_ids VARCHAR(255),
@@ -76,28 +76,90 @@ def insert_combined_chart_details(conn, combined_chart_details):
 
 
 
+def get_db_connection(dbname="datasource"):
+    conn = psycopg2.connect(
+        dbname=dbname,
+        # user="postgres",
+        # password="jaTHU@12",
+        # host="localhost",
+        # port="5432"
+        user=USER_NAME,
+        password=PASSWORD,
+        host=HOST,
+        port=PORT
+    )
+    return conn
 
+def get_company_db_connection(company_name):
 
-def get_dashboard_names(company_name_global):
-    conn = create_connection()
-    if conn:
+    # This is where you define the connection string
+    conn = psycopg2.connect(
+        dbname=company_name,  # Ensure this is the correct company database
+        user=USER_NAME,
+        password=PASSWORD,
+        host=HOST,
+        port=PORT
+    )
+    return conn 
+
+def get_dashboard_names(user_id, company_name_global):
+    # Step 1: Get employees reporting to the given user_id from the company database.
+    conn_company = get_company_db_connection(company_name_global)
+    reporting_employees = []
+
+    if conn_company:
         try:
-            cursor = conn.cursor()
-            query = ("SELECT file_name FROM dashboard_details_wu_id WHERE company_name = %s")
-            cursor.execute(query, (company_name_global,))
-            chart_names = [row[0] for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
-            print("chart_names", chart_names)
-            return chart_names
-        except psycopg2.Error as e:
-            print("Error fetching chart names:", e)
-            conn.close()
-            return None
-    else:
-        return None
-    
+            with conn_company.cursor() as cursor:
+                # Check if reporting_id column exists dynamically (skip errors if missing).
+                cursor.execute(""" 
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name='employee_list' AND column_name='reporting_id'
+                """)
+                column_exists = cursor.fetchone()
 
+                if column_exists:
+                    # Fetch employees who report to the given user_id (including NULL reporting_id if not assigned).
+                    cursor.execute("""
+                        # SELECT employee_id FROM employee_list WHERE reporting_id = %s 
+                    """, (user_id,))
+                    reporting_employees = [row[0] for row in cursor.fetchall()]
+        except psycopg2.Error as e:
+            print(f"Error fetching reporting employees: {e}")
+        finally:
+            conn_company.close()
+
+    # Include the user's own employee_id for fetching their charts.
+    # Convert all IDs to integers for consistent data type handling.
+    all_employee_ids = list(map(int, reporting_employees)) + [int(user_id)]
+
+    # Step 2: Fetch dashboard names for these employees from the datasource database.
+    conn_datasource = get_db_connection("datasource")
+    dashboard_names = {}
+
+    if conn_datasource:
+        try:
+            with conn_datasource.cursor() as cursor:
+                # Create placeholders for the IN clause
+                placeholders = ', '.join(['%s'] * len(all_employee_ids))
+                query = f"""
+                    SELECT user_id, file_name FROM dashboard_details_wu_id
+                    WHERE user_id IN ({placeholders}) and company_name = %s
+                """
+                # cursor.execute(query, tuple(all_employee_ids))
+                cursor.execute(query, tuple(map(str, all_employee_ids))+ (company_name_global,))
+                dashboards = cursor.fetchall()
+
+                # Organize dashboards by user_id
+                for uid, file_name in dashboards:
+                    if uid not in dashboard_names:
+                        dashboard_names[uid] = []
+                    dashboard_names[uid].append(file_name)
+        except psycopg2.Error as e:
+            print(f"Error fetching dashboard details: {e}")
+        finally:
+            conn_datasource.close()
+
+    return dashboard_names
 
 import psycopg2
 import pandas as pd

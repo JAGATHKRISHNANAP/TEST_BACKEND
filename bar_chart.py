@@ -313,7 +313,13 @@ def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column
     x_axis_columns_str = ', '.join(f'"{column}"' for column in x_axis_columns)
     options = [option.strip() for option in checked_option.split(',')]
     placeholders = ','.join(['%s' for _ in options])
-    query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
+    # query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
+    # Ensure there are at least two columns for y_axis_columns, or handle it appropriately
+    if len(y_axis_column) == 1:
+        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
+    
+    else:
+        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]}, {aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
 
     print("Constructed Query:", cur.mogrify(query, options).decode('utf-8'))
     cur.execute(query,options)

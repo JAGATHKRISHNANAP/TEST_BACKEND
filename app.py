@@ -9,9 +9,10 @@ from csv_upload import upload_csv_to_postgresql
 from dashboard_design import get_database_table_names
 from bar_chart import fetch_data ,drill_down,fetch_column_name ,calculationFetch,fetch_data_for_duel ,perform_calculation,get_column_names,fetchText_data,edit_fetch_data,fetch_hierarchical_data,Hierarchial_drill_down
 import traceback
+from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
 import bar_chart as bc
 from dashboard_save.dashboard_save import insert_combined_chart_details, create_dashboard_table, create_connection,get_dashboard_names,get_dashboard_view_chart_data
-from signup.signup import insert_user_data,fetch_usersdata,fetch_login_data,connect_db,create_user_table,encrypt_password,fetch_company_login_data
+from signup.signup import insert_user_data,fetch_usersdata,fetch_login_data,connect_db,create_user_table,encrypt_password,fetch_company_login_data,is_table_used_in_charts
 import psycopg2
 from audio import allowed_file,transcribe_audio_with_timestamps,save_file_to_db
 from histogram_utils import generate_histogram_details,handle_column_data_types
@@ -153,14 +154,25 @@ def load_data():
     print("Checked paths:", checked_paths)
     return jsonify({'message': 'Data loaded successfully'})
 
-@app.route('/table_names')
+@app.route('/api/table_names')
 def get_table_names():
-    database_name=request.args.get('databaseName')
-    table_names_response = get_database_table_names(database_name, username, password, host, port)
+    db_name = request.args.get('databaseName')
+    print("db name",db_name)
+    table_names_response = get_database_table_names(db_name, username, password, host, port)
+    print("table_names",table_names_response )
     if table_names_response is None:
         return jsonify({'message': 'Error fetching table names'}), 500
     table_names = table_names_response.get_json()  
     return jsonify(table_names)
+
+# @app.route('/table_names')
+# def get_table_names():
+#     database_name=request.args.get('databaseName')
+#     table_names_response = get_database_table_names(database_name, username, password, host, port)
+#     if table_names_response is None:
+#         return jsonify({'message': 'Error fetching table names'}), 500
+#     table_names = table_names_response.get_json()  
+#     return jsonify(table_names)
 
 @app.route('/column_names/<table_name>',methods=['GET'] )
 def get_columns(table_name):
@@ -224,6 +236,17 @@ def get_bar_chart_route():
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
+    if len(x_axis_columns) == 2:  # Handle dual X-axis scenario
+            data = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+            
+            # Return categories and series for dual X-axis chart
+            return jsonify({
+                "categories": [row[0] for row in data],  # First X-axis category
+                "series1": [row[1] for row in data],  # Series 1 data
+                "series2": [row[1] for row in data],  # Series 2 data
+                "dataframe": df_json
+            })
+        
     try:
         df[y_axis_columns[0]] = pd.to_datetime(df[y_axis_columns[0]], format='%H:%M:%S', errors='raise')
 
@@ -276,7 +299,7 @@ def get_bar_chart_route():
         }
         
         return jsonify(data)
-
+    
 def initial_value(aggregation):
     if aggregation in ['sum', 'average']:
         return 0
@@ -313,6 +336,12 @@ def get_edit_chart_route():
     checked_option = data['filterOptions'] 
     db_nameeee = data['databaseName']
     print(".......................................",data)
+    print(".......................................db_nameeee",db_nameeee)
+    print(".......................................checked_option",checked_option)
+    print("......................................xAxis.",x_axis_columns)
+    print(".......................................yAxis",y_axis_columns)
+    print(".......................................table_name",table_name)
+    
     if len(y_axis_columns) == 1:
         data = edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
         print("data====================", data)     
@@ -412,7 +441,10 @@ def get_filter_options(selectedTable, columnName):
     table_name=selectedTable
     column_name=columnName
     db_nameeee= request.args.get('databaseName')
+    
+    print("table_name====================",table_name)
     print("db_nameeee====================",db_nameeee)
+    print("column_name====================",column_name)
     column_data=fetch_column_name(table_name, column_name, db_nameeee)
     print("column_data====================",column_data)
     return jsonify(column_data)
@@ -566,36 +598,88 @@ def connect_to_db():
         print("Error connecting to the database:", e)
         return None
 
-def get_chart_names(company_name_global):
-    conn = connect_to_db()
-    if conn:
+def get_chart_names(user_id, company_name_global):
+    # Step 1: Get employees reporting to the given user_id from the company database.
+    conn_company = get_company_db_connection(company_name_global)
+    reporting_employees = []
+
+    if conn_company:
         try:
-            cursor = conn.cursor()
-            query = "SELECT chart_name FROM new_dashboard_details_new WHERE company_name = %s"
-            cursor.execute(query, (company_name_global,))
-            chart_names = [row[0] for row in cursor.fetchall()]
-            cursor.close()
-            conn.close()
-            print("chart_names", chart_names)
-            return chart_names
+            with conn_company.cursor() as cursor:
+                # Check if reporting_id column exists dynamically (skip errors if missing).
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name='employee_list' AND column_name='reporting_id'
+                """)
+                column_exists = cursor.fetchone()
+
+                if column_exists:
+                    # Fetch employees who report to the given user_id (including NULL reporting_id if not assigned).
+                    cursor.execute("""
+                        SELECT employee_id FROM employee_list WHERE reporting_id = %s 
+                    """, (user_id,))
+                    reporting_employees = [row[0] for row in cursor.fetchall()]
+                    print("reporting_employees",reporting_employees)
         except psycopg2.Error as e:
-            print("Error fetching chart names:", e)
-            conn.close()
-            return None
-    else:
-        return None
+            print(f"Error fetching reporting employees: {e}")
+        finally:
+            conn_company.close()
+
+    # Include the user's own employee_id for fetching their charts.
+    # Convert all IDs to integers for consistent data type handling.
+    all_employee_ids = list(map(int, reporting_employees)) + [int(user_id)]
+    print("all_employee_ids",all_employee_ids)
+    # Step 2: Fetch dashboard names for these employees from the datasource database.
+    conn_datasource = get_db_connection("datasource")
+    dashboard_structure = {}
+
+    if conn_datasource:
+        try:
+            with conn_datasource.cursor() as cursor:
+                # Create placeholders for the IN clause
+                placeholders = ', '.join(['%s'] * len(all_employee_ids))
+                
+                query = f"""
+                    SELECT user_id, chart_name FROM new_dashboard_details_new
+                    WHERE user_id IN ({placeholders}) and company_name = %s
+                """
+                cursor.execute(query, tuple(all_employee_ids)+ (company_name_global,))
+                print("query",query)
+                charts = cursor.fetchall()
+                print("charts",charts)
+                
+                # Organize charts by user_id
+                for uid, chart_name in charts:
+                    if uid not in dashboard_structure:
+                        dashboard_structure[uid] = []
+                    dashboard_structure[uid].append(chart_name)
+        except psycopg2.Error as e:
+            print(f"Error fetching dashboard details: {e}")
+        finally:
+            conn_datasource.close()
+
+    return dashboard_structure
+
+
 
 @app.route('/total_rows', methods=['GET'])
 def chart_names():
     global company_name_global
-    print("company_name====================",company_name_global)  
-    
-    names = get_chart_names(company_name_global)
+    user_id = request.args.get('user_id')
+    print("user_id====================", user_id)  
+
+    try:
+        user_id = int(user_id)  # Convert to integer
+    except ValueError:
+        return jsonify({'error': 'Invalid user_id. Must be an integer.'})
+
+    names = get_chart_names(user_id, company_name_global)
     print("names====================", names)   
     if names is not None:
         return jsonify({'chart_names': names})
     else:
         return jsonify({'error': 'Failed to fetch chart names'})
+
 
 def get_chart_data(chart_name):
     print("chart_id====================......................................................",chart_name)
@@ -929,13 +1013,17 @@ def handle_clicked_category():
     category = data.get('category')
     charts= data.get('charts')  
     clicked_catagory_Xaxis=data.get('x_axis')
+    print("data", data)
     print("Category clicked:", category)
     print("clicked_catagory_Xaxis====================",clicked_catagory_Xaxis)
     if isinstance(clicked_catagory_Xaxis, list):
             clicked_catagory_Xaxis = ', '.join(clicked_catagory_Xaxis)
-    # print("Charts:", charts)    
+    
+    print("Charts:", charts)    
     chart_details = []
+    print("chart_details :", chart_details)
     chart_data_list = []
+    print("chart_data_list :", chart_data_list)
     if charts:
         charts_count = len(charts)  
         print("Charts count:", charts_count)
@@ -1221,22 +1309,31 @@ def dashboard_data(dashboard_name):
     else:
         return jsonify({'error': 'Failed to fetch data for Chart {}'.format(dashboard_name)})
 
+
+
 @app.route('/saved_dashboard_total_rows', methods=['GET'])
 def saved_dashboard_names():
     global company_name_global
-    names = get_dashboard_names(company_name_global)
+    user_id = request.args.get('user_id')  # Retrieve user_id from query parameters
+
+    print(f"Received user_id: {user_id}")  # Debugging output
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+
+    names = get_dashboard_names(user_id,company_name_global)
+    
     print("names====================", names)   
     if names is not None:
         return jsonify({'chart_names': names})
     else:
         return jsonify({'error': 'Failed to fetch chart names'})
 
-
 @app.route('/api/usersignup', methods=['POST'])
 def usersignup():
     data = request.json
     print("Received Data:", data)
-
+    company=data.get("company")
+    print("company:", company)
     register_type = data.get("registerType")
     print("Register Type:", register_type)
 
@@ -1244,242 +1341,14 @@ def usersignup():
     print("User Details:", user_details)
 
     if register_type == "manual":
-        # Manual Registration Handling
-        employee_name = user_details.get("employeeName")
-        role_name = user_details.get("roleId")  # This is a role name (e.g., "Developer")
-        organization_name = user_details.get("company")
-        username = user_details.get("userName")
-        email=user_details.get("email")
-        password = user_details.get("password")
-        retype_password = user_details.get("retypePassword")
-        categories = user_details.get("categories", [])  # Extract categories as a list
-
-        if password != retype_password:
-            return jsonify({'message': 'Passwords do not match'}), 400
-
-        # Connect to the signup database first to get the role_id
-        conn_datasource = get_db_connection("datasource")
-        if not conn_datasource:
-            print("Failed to connect to signup database.")
-            return jsonify({'message': 'Failed to connect to signup database'}), 500
-
-        try:
-            # Fetch the role_id based on the role name from the signup database
-            with conn_datasource.cursor() as cursor_datasource:
-                cursor_datasource.execute("""
-                    SELECT role_id FROM role WHERE LOWER(role_name) = LOWER(%s)
-                """, (role_name,))
-                role_data = cursor_datasource.fetchone()
-
-                if not role_data:
-                    print(f"Role not found for role name: {role_name}")
-                    return jsonify({'message': 'Role not found for role name: ' + role_name}), 404
-
-                role_id = role_data[0]  # Get the role_id
-
-        except Exception as e:
-            print(f"Error fetching role_id: {e}")
-            return jsonify({'message': 'Error fetching role_id'}), 500
-
-        # Connect to the respective company's database
-        conn = get_company_db_connection(organization_name)
-        if not conn:
-            print(f"Failed to connect to company database for {organization_name}.")
-            return jsonify({'message': 'Failed to connect to company database'}), 500
-        create_user_table(conn)
-
-        try:
-            with conn.cursor() as cursor:
-                # Check if the username already exists in employee_list
-                cursor.execute("""
-                    SELECT COUNT(*) FROM employee_list WHERE username = %s
-                """, (username,))
-                result = cursor.fetchone()
-
-                if result and result[0] > 0:
-                    return jsonify({'message': 'Username already exists in employee_list'}), 400
-
-                # Encrypt the password
-                hashed_password = encrypt_password(password)
-
-                # Define the action_type and action_by fields
-                action_type = "add"  # New user registration, action type set to 'add'
-                action_by = "admin"  # Set this to the current admin's username or user ID
-
-                # Insert into employee_list table in the company database
-                cursor.execute("""
-                    INSERT INTO employee_list (employee_name, role_id, username,email, password,category, action_type, action_by)
-                    VALUES (%s, %s, %s,%s, %s,%s, %s, %s)
-                """, (employee_name, role_id, username,email, hashed_password, categories,action_type, action_by))
-
-                # Retrieve the generated employee_id
-                cursor.execute("SELECT currval(pg_get_serial_sequence('employee_list', 'employee_id'))")
-                employee_id = cursor.fetchone()[0]
-
-            # Handle category insertion with check for duplicate category under same company
-            if categories:
-                for category in categories:
-                    with conn_datasource.cursor() as cursor_datasource:
-                        # Check if the category already exists for the specific company
-                        cursor_datasource.execute("""
-                            SELECT category_id FROM category 
-                            WHERE LOWER(category_name) = LOWER(%s) 
-                            AND company_id = (SELECT id FROM organizationdatatest WHERE organizationname = %s)
-                        """, (category, organization_name))
-                        
-                        result = cursor_datasource.fetchone()
-                        
-                        if result:
-                            # If the category exists for the same company, raise an error
-                            return jsonify({
-                                'message': f"Category '{category}' already exists for the company '{organization_name}'"
-                            }), 400
-
-                        # Insert the new category if it doesn't exist
-                        cursor_datasource.execute("""
-                            INSERT INTO category (category_name, company_id)
-                            VALUES (%s, (SELECT id FROM organizationdatatest WHERE organizationname = %s))
-                            RETURNING category_id;
-                        """, (category, organization_name))
-                        category_id = cursor_datasource.fetchone()[0]  # Fetch the new category_id
-
-                        # Insert the user into the signup database with the category_id
-                        cursor_datasource.execute("""
-                            INSERT INTO "user" (user_id, role_id, company_id, category_id)
-                            VALUES (%s, %s, (SELECT id FROM organizationdatatest WHERE organizationname = %s), %s)
-                        """, (employee_id, role_id, organization_name, category_id))
-
-            # Commit transactions only after all validation and inserts are successful
-            conn.commit()  
-            conn_datasource.commit()
-
-            return jsonify({'message': 'User and categories created successfully'}), 200
-        except Exception as e:
-            print(f"Error: {e}")
-            return jsonify({'message': 'Error creating user'}), 500
-
-        finally:
-            # Close both database connections
-            conn.close()
-            conn_datasource.close()
-
+        return handle_manual_registration(user_details)
     elif register_type == "File_Upload":
-    # File upload handling (similar logic for action_type applies here)
-        conn_datasource = get_db_connection("datasource")
-        if not conn_datasource:
-            return jsonify({'message': 'Failed to connect to datasource database'}), 500
+        return handle_file_upload_registration(user_details,company)
 
-        try:
-            for user in user_details:
-                employee_name = user.get("employeeName")
-                role_name = user.get("roleId")  # This is a role name (e.g., "Developer")
-                organization_name = user.get("company")
-                username = user.get("userName")
-                password = user.get("Password")
-                categories = user.get("category")
-                email = user.get("email")
-                category_list = [category.strip() for category in categories.splitlines()]
+    return jsonify({'message': 'Invalid registration type'}), 400
 
-                if not employee_name or not role_name or not username or not categories:
-                    return jsonify({'message': f'Missing required details for user: {username}'}), 400
 
-                # Fetch the role_id from the signup database
-                with conn_datasource.cursor() as cursor_datasource:
-                    cursor_datasource.execute("""
-                        SELECT role_id FROM role WHERE LOWER(role_name) = LOWER(%s)
-                    """, (role_name,))
-                    role_data = cursor_datasource.fetchone()
 
-                    if not role_data:
-                        return jsonify({'message': f'Role not found for user: {username}'}), 404
-
-                    role_id = role_data[0]
-
-                # Connect to the company's database
-                conn = connect_db(organization_name)
-                if not conn:
-                    return jsonify({'message': f'Failed to connect to database for company: {organization_name}'}), 500
-
-                try:
-                    with conn.cursor() as cursor:
-                        # Check if the username already exists in employee_list
-                        cursor.execute("""
-                            SELECT COUNT(*) FROM employee_list WHERE username = %s
-                        """, (username,))
-                        result = cursor.fetchone()
-
-                        if result and result[0] > 0:
-                            return jsonify({'message': f'Username already exists for user: {username}'}), 400
-
-                        # Encrypt the password
-                        hashed_password = encrypt_password(password)
-
-                        # Insert into employee_list table
-                        action_type = "add"  # File upload case, action type is 'add'
-                        action_by = "admin"  # Set dynamically based on the user performing the action
-
-                        cursor.execute("""
-                            INSERT INTO employee_list (employee_name, role_id, username,category, email, password, action_type, action_by)
-                            VALUES (%s, %s, %s, %s,%s, %s, %s, %s)
-                        """, (employee_name, role_id, username, categories,email, hashed_password, action_type, action_by))
-
-                        # Retrieve the generated employee_id
-                        cursor.execute("SELECT currval(pg_get_serial_sequence('employee_list', 'employee_id'))")
-                        employee_id = cursor.fetchone()[0]
-
-                    # Handle category insertion for file upload with duplicate check
-                    for category in category_list:
-                        # Open a new cursor for each category
-                        with conn_datasource.cursor() as cursor_datasource:
-                            cursor_datasource.execute("""
-                                SELECT category_id FROM category 
-                                WHERE LOWER(category_name) = LOWER(%s) 
-                                AND company_id = (SELECT id FROM organizationdatatest WHERE organizationname = %s)
-                            """, (category, organization_name))
-                            
-                            result = cursor_datasource.fetchone()
-
-                            if result:
-                                return jsonify({
-                                    'message': f"Category '{category}' already exists for the company '{organization_name}'"
-                                }), 400
-
-                            # Insert new category if not found
-                            cursor_datasource.execute("""
-                                INSERT INTO category (category_name, company_id)
-                                VALUES (%s, (SELECT id FROM organizationdatatest WHERE organizationname = %s))
-                                RETURNING category_id;
-                            """, (category, organization_name))
-                            category_id = cursor_datasource.fetchone()[0]
-
-                        # Insert into the user table in the signup database
-                        with conn_datasource.cursor() as cursor_datasource:  # New cursor for user table insertion
-                            cursor_datasource.execute("""
-                                INSERT INTO "user" (user_id, role_id, company_id, category_id)
-                                VALUES (%s, %s, (SELECT id FROM organizationdatatest WHERE organizationname = %s), %s)
-                            """, (employee_id, role_id, organization_name, category_id))
-
-                    # Commit transactions after all user and category insertions are complete
-                    conn.commit()
-                    conn_datasource.commit()
-
-                except Exception as e:
-                    print(f"Error processing file upload user {username}: {e}")
-                    return jsonify({'message': f'Error processing file upload for user: {username}'}), 500
-
-                finally:
-                    if conn:
-                        conn.close()
-
-        except Exception as e:
-            print(f"Error processing file upload: {e}")
-            return jsonify({'message': 'Error processing file upload'}), 500
-
-        finally:
-            if conn_datasource:
-                conn_datasource.close()
-
-        return jsonify({'message': 'File upload processed successfully'}), 200
 
 def get_db_connection(dbname="datasource"):
     conn = psycopg2.connect(
@@ -1928,11 +1797,293 @@ def upload_file_json():
         return jsonify({'message': f"Internal Server Error: {str(e)}"}), 500
 
 
+#*----------------------------Gayathri(12/15/24)--------------------------*
+
+from psycopg2.extras import RealDictCursor
+
+@app.route('/api/charts/<string:chart_name>', methods=['DELETE'])
+def delete_chart(chart_name):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Failed to connect to the database"}), 500
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Delete the chart from the table
+        cur.execute("DELETE FROM new_dashboard_details_new WHERE chart_name = %s", (chart_name,))
+        rows_deleted = cur.rowcount
+        
+        # Commit changes and close the connection
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # If no rows were deleted, return a 404 error
+        if rows_deleted == 0:
+            return jsonify({"message": f"No chart found with the name '{chart_name}'"}), 404
+
+        return jsonify({"message": f"Chart '{chart_name}' deleted successfully"}), 200
+    
+    except Exception as e:
+        print("Error while deleting chart:", e)
+        return jsonify({"error": "Failed to delete chart"}), 500
+@app.route('/delete-chart', methods=['DELETE'])
+def delete_dashboard_name():
+    chart_name = request.json.get('chart_name')  # Get the chart_name from JSON body
+    
+    if not chart_name:
+        return jsonify({"error": "Chart name is required"}), 400
+    
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Failed to connect to the database"}), 500
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("DELETE FROM dashboard_details_wu_id WHERE file_name = %s", (chart_name,))
+        rows_deleted = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        if rows_deleted == 0:
+            return jsonify({"message": f"No chart found with the name '{chart_name}'"}), 404
+
+        return jsonify({"message": f"Chart '{chart_name}' deleted successfully"}), 200
+    
+    except Exception as e:
+        print("Error while deleting chart:", e)
+        return jsonify({"error": "Failed to delete chart"}), 500
+
+
+
+
+# @app.route('/api/is-chart-in-dashboard', methods=['GET'])
+# def is_chart_in_dashboard():
+#     chart_name = request.args.get('chart_name')  # Get the chart_name from query parameters
+    
+#     if not chart_name:
+#         return jsonify({"error": "Chart name is required"}), 400
+
+#     conn = get_db_connection()
+#     if conn is None:
+#         return jsonify({"error": "Failed to connect to the database"}), 500
+    
+#     try:
+#         cur = conn.cursor(cursor_factory=RealDictCursor)
+#         cur.execute("SELECT * FROM dashboard_details_WU_ID WHERE chart_type LIKE %s", (f'%{chart_name}%',))
+#         chart_in_dashboard = cur.fetchone()
+#         cur.close()
+#         conn.close()
+
+#         if chart_in_dashboard:
+#             return jsonify({"isInDashboard": True, "message": f"Chart '{chart_name}' is being used in a dashboard."}), 200
+#         else:
+#             return jsonify({"isInDashboard": False, "message": f"Chart '{chart_name}' is not being used in a dashboard."}), 200
+
+#     except Exception as e:
+#         print("Error checking chart usage:", e)
+#         return jsonify({"error": "Failed to check if chart is used"}), 500
+
+# if __name__ == "__main__":
+#     app.run(debug=True)
+
+# @app.route('/api/is-chart-in-dashboard', methods=['GET'])
+# def is_chart_in_dashboard():
+#     chart_name = request.args.get('chart_name')  # Get the chart_name from query parameters
+    
+#     if not chart_name:
+#         return jsonify({"error": "Chart name is required"}), 400
+
+#     conn = get_db_connection()
+#     if conn is None:
+#         return jsonify({"error": "Failed to connect to the database"}), 500
+    
+#     try:
+#         cur = conn.cursor(cursor_factory=RealDictCursor)
+#         # Update the query to reference the new table and look for chart ID or related field
+#         cur.execute("""
+#             SELECT * 
+#             FROM dashboard_details_wu_id 
+#             WHERE chart_ids IN (SELECT CAST(id AS VARCHAR) FROM new_dashboard_details_new WHERE chart_name = %s)
+#         """, (chart_name,))
+
+#         chart_in_dashboard = cur.fetchone()
+#         cur.close()
+#         conn.close()
+
+#         if chart_in_dashboard:
+#             return jsonify({
+#                 "isInDashboard": True, 
+#                 "message": f"Chart '{chart_name}' is being used in a dashboard."
+#             }), 200
+#         else:
+#             return jsonify({
+#                 "isInDashboard": False, 
+#                 "message": f"Chart '{chart_name}' is not being used in a dashboard."
+#             }), 200
+
+#     except Exception as e:
+#         print("Error checking chart usage:", e)
+#         return jsonify({"error": "Failed to check if chart is used"}), 500
+@app.route('/api/is-chart-in-dashboard', methods=['GET'])
+def is_chart_in_dashboard():
+    chart_name = request.args.get('chart_name')
+    
+    if not chart_name:
+        return jsonify({"error": "Chart name is required"}), 400
+
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Failed to connect to the database"}), 500
+
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Fetch data using subquery for chart_id
+        cur.execute("""
+            SELECT * 
+FROM dashboard_details_wu_id 
+WHERE 
+    (SELECT id FROM new_dashboard_details_new WHERE chart_name = %s)::INTEGER 
+    = ANY(string_to_array(trim(BOTH '{}' FROM chart_ids), ',')::INTEGER[])
+
+        """, (chart_name,))
+        
+        chart_in_dashboard = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if chart_in_dashboard:
+            return jsonify({
+                "isInDashboard": True,
+                "message": f"Chart '{chart_name}' is being used in a dashboard."
+            }), 200
+        else:
+            return jsonify({
+                "isInDashboard": False,
+                "message": f"Chart '{chart_name}' is not being used in a dashboard."
+            }), 200
+
+    except Exception as e:
+        print("Error checking chart usage:", e)
+        return jsonify({"error": "Failed to check if chart is used"}), 500
+
+
+
+# @app.route('/api/table-columns/<table_name>', methods=['GET'])
+# def api_get_table_columns(table_name):
+#     try:
+#         columns = get_table_columns(table_name)
+#         print("colums",columns)
+#         return jsonify(columns), 200
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/table-columns/<table_name>', methods=['GET'])
+def api_get_table_columns(table_name):
+    try:
+        # Get the company name from the query parameters
+        company_name = request.args.get('companyName')
+        
+        # Ensure the company_name is provided
+        if not company_name:
+            return jsonify({"error": "Company name is required"}), 400
+        
+        columns = get_table_columns(table_name, company_name)
+        print("columns", columns)
+        return jsonify(columns), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# def get_table_columns(table_name):
+#     company=company_name_global
+#     conn = get_company_db_connection(company)
+#      # Replace with your database name
+#     cur = conn.cursor()
+#     cur.execute(
+#         """
+#         SELECT column_name 
+#         FROM information_schema.columns 
+#         WHERE table_name = %s
+#         """,
+#         (table_name,)
+#     )
+#     columns = [row[0] for row in cur.fetchall()]
+#     cur.close()
+#     conn.close()
+#     return columns
+
+
+@app.route('/api/employees', methods=['GET'])
+def get_employees():
+    company = request.args.get('company')  # Get company name from query parameter
+    print("comapnay",company)
+    if not company:
+        return jsonify({"error": "Company parameter is missing"}), 400
+
+    conn = get_company_db_connection(company)  # Assuming `get_db_connection` is a function to connect to your database
+    cur = conn.cursor()
+    cur.execute('SELECT employee_id, employee_name FROM employee_list ')
+    employees = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    # Format the employee data into a list of dictionaries
+    employee_list = [{'employee_id': emp[0], 'employee_name': emp[1]} for emp in employees]
+    print(employee_list)  # Optionally, log the employee list for debugging purposes
+
+    return jsonify(employee_list)
+
+
+def get_table_columns(table_name,company_name):
+    company = company_name
+    conn = get_company_db_connection(company)
+    print("company",conn)
+    if conn is None:
+        print("Failed to connect to the database.")
+        return []
+    
+    try:
+        cur = conn.cursor()
+        print(f"Executing query to fetch columns for table: {table_name}")
+        cur.execute(
+            """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s AND table_schema = 'public'  -- Adjust schema if necessary
+            """,
+            (table_name,)
+        )
+        columns = [row[0] for row in cur.fetchall()]
+        print("Columns fetched:", columns)
+        cur.close()
+        conn.close()
+        return columns
+    except Exception as e:
+        print(f"Error fetching columns for table {table_name}: {e}")
+        return []
+    
+    
+@app.route('/api/checkTableUsage', methods=['GET'])
+def check_table_usage():
+    table_name = request.args.get('tableName')
+
+    if not table_name:
+        return jsonify({"error": "Table name is required"}), 400
+
+    # Remove any surrounding quotes from the table name
+    table_name = table_name.strip('"').strip("'")
+
+    # Debugging: Print the received table name
+    print(f"Received table name: {table_name}")
+
+    # Check if the table is used for chart creation
+    is_in_use = is_table_used_in_charts(table_name)
+    print("is_in_use",is_in_use)
+    return jsonify({"isInUse": is_in_use})
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=80)
-    # app.run(debug=True)
-
-
-
+    app.run(debug=True)
+   

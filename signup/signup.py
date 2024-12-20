@@ -303,3 +303,59 @@ def encrypt_password(plain_password):
     """
     hashed_password = bcrypt.hashpw(plain_password.encode('utf-8'), bcrypt.gensalt())
     return hashed_password
+def create_category_table_if_not_exists(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS category (
+            category_id SERIAL PRIMARY KEY,
+            category_name VARCHAR(255) NOT NULL,
+            company_id INT NOT NULL,
+            FOREIGN KEY (company_id) REFERENCES organizationdatatest(id) ON DELETE CASCADE
+        );
+    """)
+def create_user_table(conn):
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS employee_list (
+                    employee_id SERIAL PRIMARY KEY,
+                    employee_name VARCHAR(255),
+                    role_id VARCHAR(255),
+                    username VARCHAR(255),
+                    email VARCHAR(255),
+                    password VARCHAR(255),
+                    category VARCHAR(255),
+                    action_type VARCHAR(255),
+                    action_by VARCHAR(255),
+                    reporting_id INTEGER
+                );
+            """)
+        conn.commit()
+    except Exception as e:
+        print(f"Error creating table: {e}")
+def create_user_table_if_not_exists(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS "user" (
+            id SERIAL PRIMARY KEY, 
+            company_id INT NOT NULL,  -- Changed the column order to include company_id first
+            user_id INT NOT NULL, 
+            role_id INT NOT NULL, 
+            category_id INT NOT NULL, 
+            FOREIGN KEY (role_id) REFERENCES role(role_id),
+            FOREIGN KEY (company_id) REFERENCES organizationdatatest(id),
+            FOREIGN KEY (category_id) REFERENCES category(category_id)
+        );
+    """)
+
+# Function to check if a table is used in chart creation
+def is_table_used_in_charts( table_name):
+    conn = get_db_connection(dbname="datasource")
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT EXISTS (
+            SELECT 1 FROM new_dashboard_details_new WHERE selected_table = %s
+        )
+        """,
+        (table_name,)
+    )
+    return cur.fetchone()[0]
