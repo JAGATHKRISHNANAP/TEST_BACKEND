@@ -399,7 +399,7 @@ from flask import Flask, jsonify, request
 import psycopg2
 import bcrypt
 from config import PASSWORD, USER_NAME, HOST, PORT
-from signup.signup import  encrypt_password,  create_category_table_if_not_exists
+from signup.signup import  encrypt_password
 
 app = Flask(__name__)
 
@@ -619,6 +619,15 @@ def get_company_db_connection(company_name):
 
 
 # Create user table in company database
+def create_category_table_if_not_exists(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS category (
+            category_id SERIAL PRIMARY KEY,
+            category_name VARCHAR(255) NOT NULL,
+            company_id INT NOT NULL,
+            FOREIGN KEY (company_id) REFERENCES organizationdatatest(id) ON DELETE CASCADE
+        );
+    """)
 def create_user_table(conn):
     try:
         with conn.cursor() as cursor:
