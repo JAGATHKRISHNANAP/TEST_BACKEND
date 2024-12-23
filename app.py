@@ -1,3 +1,4 @@
+# 23-12-2024
 import os
 from flask_cors import CORS
 import json
@@ -310,17 +311,44 @@ def get_edit_chart_route():
     checked_option = data['filterOptions'] 
     db_nameeee = data['databaseName']
     print(".......................................",data)
+    # if len(y_axis_columns) == 1:
+    #     data = edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+    #     print("data====================", data)     
+    #     categories = {}  
+    #     for row in data:
+    #         category = tuple(row[:-1])
+    #         y_axis_value = row[-1]
+    #         if category not in categories:
+    #             categories[category] = initial_value(aggregation)
+    #         update_category(categories, category, y_axis_value, aggregation)      
+    #     labels = [', '.join(category) for category in categories.keys()]  
+    #     values = list(categories.values())
+    #     print("labels====================", labels)
+    #     print("values====================", values)
+    #     return jsonify({"categories": labels, "values": values, "aggregation": aggregation})
     if len(y_axis_columns) == 1:
-        data = edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
-        print("data====================", data)     
-        categories = {}  
+        data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        
+        if aggregation == "count":
+            print("Data for count aggregation:", data)
+            array1 = [item[0] for item in data]
+            array2 = [item[1] for item in data]
+            print("Array1:", array1)
+            print("Array2:", array2)
+            
+            # Return the JSON response for count aggregation
+            return jsonify({"categories": array1, "values": array2, "aggregation": aggregation})
+        
+        # For other aggregation types
+        categories = {}
         for row in data:
             category = tuple(row[:-1])
             y_axis_value = row[-1]
             if category not in categories:
                 categories[category] = initial_value(aggregation)
-            update_category(categories, category, y_axis_value, aggregation)      
-        labels = [', '.join(category) for category in categories.keys()]  
+            update_category(categories, category, y_axis_value, aggregation)
+
+        labels = [', '.join(category) for category in categories.keys()]
         values = list(categories.values())
         print("labels====================", labels)
         print("values====================", values)
@@ -412,7 +440,7 @@ def get_filter_options(selectedTable, columnName):
     xAxis = request.args.getlist('xAxis[]')  # Use getlist() to retrieve all values
     print("xAxis====================",xAxis)
     print("db_nameeee====================",db_nameeee)
-    column_data=fetch_column_name(table_name, column_name, db_nameeee,xAxis)
+    column_data=fetch_column_name(table_name, column_name, db_nameeee)
     print("column_data====================",column_data)
     return jsonify(column_data)
 
@@ -564,95 +592,6 @@ def connect_to_db():
     except psycopg2.Error as e:
         print("Error connecting to the database:", e)
         return None
-
-# def get_chart_names(company_name_global):
-#     conn = connect_to_db()
-#     if conn:
-#         try:
-#             cursor = conn.cursor()
-#             query = "SELECT chart_name FROM new_dashboard_details_new WHERE company_name = %s"
-#             cursor.execute(query, (company_name_global,))
-#             chart_names = [row[0] for row in cursor.fetchall()]
-#             cursor.close()
-#             conn.close()
-#             print("chart_names", chart_names)
-#             return chart_names
-#         except psycopg2.Error as e:
-#             print("Error fetching chart names:", e)
-#             conn.close()
-#             return None
-#     else:
-#         return None
-
-
-# def get_chart_names(user_id, company_name_global):
-#     # Step 1: Get employees reporting to the given user_id from the company database.
-#     conn_company = get_company_db_connection(company_name_global)
-#     # print("company_name_global====================",conn_company)
-#     reporting_employees = []
-
-#     if conn_company:
-#         try:
-#             with conn_company.cursor() as cursor:
-#                 # Check if reporting_id column exists dynamically (skip errors if missing).
-#                 cursor.execute("""
-#                     SELECT column_name FROM information_schema.columns 
-#                     WHERE table_name='employee_list' AND column_name='reporting_id'
-#                 """)
-#                 column_exists = cursor.fetchone()
-
-#                 if column_exists:
-#                     # Fetch employees who report to the given user_id (including NULL reporting_id if not assigned).
-#                     cursor.execute("""
-#                         SELECT employee_id FROM employee_list WHERE reporting_id = %s OR reporting_id IS NULL
-#                     """, (user_id,))
-#                     reporting_employees = [row[0] for row in cursor.fetchall()]
-#                     print(f"Reporting employees: {reporting_employees}")
-
-#         except psycopg2.Error as e:
-#             print(f"Error fetching reporting employees: {e}")
-#         finally:
-#             conn_company.close()
-
-#     # Include the user's own employee_id for fetching their charts.
-#     # Convert all IDs to integers for consistent data type handling.
-#     all_employee_ids = list(map(int, reporting_employees)) + [int(user_id)]
-
-#     # Step 2: Fetch dashboard names for these employees from the datasource database.
-#     conn_datasource = get_db_connection("datasource")
-#     dashboard_structure = {}
-
-#     if conn_datasource:
-#         try:
-#             with conn_datasource.cursor() as cursor:
-#                 # Create placeholders for the IN clause
-#                 placeholders = ', '.join(['%s'] * len(all_employee_ids))
-                
-#                 # Updated query to use placeholders for company_name
-#                 query = f"""
-#                     SELECT user_id, chart_name FROM new_dashboard_details_new
-#                     WHERE user_id IN ({placeholders}) AND company_name = %s
-#                 """
-#                 cursor.execute(query, tuple(all_employee_ids) + (company_name_global,))
-#                 charts = cursor.fetchall()
-
-#                 # Organize charts by user_id
-#                 for uid, chart_name in charts:
-#                     if uid not in dashboard_structure:
-#                         dashboard_structure[uid] = []
-#                     dashboard_structure[uid].append(chart_name)
-#         except psycopg2.Error as e:
-#             print(f"Error fetching dashboard details: {e}")
-#         finally:
-#             conn_datasource.close()
-
-#     return dashboard_structure
-
-
-
-
-
-
 def get_chart_names(user_id, company_name_global):
     # Step 1: Get employees reporting to the given user_id from the company database.
     conn_company = get_company_db_connection(company_name_global)
@@ -716,25 +655,6 @@ def get_chart_names(user_id, company_name_global):
             conn_datasource.close()
 
     return dashboard_structure
-
-
-
-
-
-
-
-
-# @app.route('/total_rows', methods=['GET'])
-# def chart_names():
-#     global company_name_global
-#     print("company_name====================",company_name_global)  
-    
-#     names = get_chart_names(company_name_global)
-#     print("names====================", names)   
-#     if names is not None:
-#         return jsonify({'chart_names': names})
-#     else:
-#         return jsonify({'error': 'Failed to fetch chart names'})
 
 
 @app.route('/total_rows', methods=['GET'])

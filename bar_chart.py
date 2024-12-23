@@ -3,6 +3,10 @@ import psycopg2
 import pandas as pd
 from config import USER_NAME, DB_NAME, PASSWORD, HOST, PORT
 
+from sqlalchemy import create_engine
+
+
+
 global_df = None  # Ensure global_df is initialized to None
 
 def is_numeric(value):
@@ -145,7 +149,10 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
     options = [option.strip() for option in checked_option.split(',')]
     # print("The options are:", options)
     filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
-    grouped_df = filtered_df.groupby(x_axis_columns_str[0]).agg({y_axis_column[0]: aggregation_func}).reset_index()
+    if aggregation =="count":
+        grouped_df = filtered_df.groupby(x_axis_columns_str[0]).size().reset_index(name='count')
+    else:
+        grouped_df = filtered_df.groupby(x_axis_columns_str[0]).agg({y_axis_column[0]: aggregation_func}).reset_index()
     
     result = [tuple(x) for x in grouped_df.to_numpy()]
     
@@ -294,33 +301,6 @@ def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):
     return result
 
 
-
-
-# def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column,aggregation,db_nameeee):
-#     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
-#     cur = conn.cursor()
-#     if aggregation == "sum":
-#         aggregation = "SUM"
-#     elif aggregation == "average":
-#         aggregation = "AVG"
-#     elif aggregation == "count":
-#         aggregation = "COUNT"
-#     elif aggregation == "maximum":
-#         aggregation = "MAX"
-#     elif aggregation == "minimum":
-#         aggregation = "MIN"
-        
-#     x_axis_columns_str = ', '.join(f'"{column}"' for column in x_axis_columns)
-#     options = [option.strip() for option in checked_option.split(',')]
-#     placeholders = ','.join(['%s' for _ in options])
-#     query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
-
-#     print("Constructed Query:", cur.mogrify(query, options).decode('utf-8'))
-#     cur.execute(query,options)
-#     rows = cur.fetchall()
-#     cur.close()
-#     conn.close()
-#     return rows
 def fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_nameeee):
     # Establish the database connection
     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
@@ -380,39 +360,19 @@ def fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_colum
     return rows
 
 
-# def fetch_column_name(table_name, x_axis_columns,db_nameeee,xAxis):
-#     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
-#     cur = conn.cursor()
-#     # for i in range(len(x_axis_columns)):
-#     query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
-#     cur.execute(query)
-#     rows = cur.fetchall()
-#     cur.close()
-#     conn.close()
-#     return rows
-
-
-def fetch_column_name(table_name, x_axis_columns, db_nameeee, xAxis):
+def fetch_column_name(table_name, x_axis_columns,db_nameeee):
     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     cur = conn.cursor()
-    # result_array = []  # Initialize an array to store the results
-    
-    if x_axis_columns in xAxis:  # Check if x_axis_columns is in xAxis
-        query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
-        cur.execute(query)
-        rows = cur.fetchall()
-        # Append the column name and its data as a dictionary
-        # result_array.append({x_axis_columns: rows})
-    
+    # for i in range(len(x_axis_columns)):
+    query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
+    cur.execute(query)
+    rows = cur.fetchall()
     cur.close()
     conn.close()
-    # print("result_array", result_array)
     return rows
 
 
 
-
-from sqlalchemy import create_engine
 
 
 def calculationFetch():
