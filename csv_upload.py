@@ -11,9 +11,13 @@ def sanitize_column_name(col_name):
     else:
         return col_name 
 
+# def clean_data(df):
+#     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+#     return df
 def clean_data(df):
-    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
     return df
+
 
 def identify_primary_key(df):
     for col in df.columns:

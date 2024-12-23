@@ -433,6 +433,9 @@ def upload_json_to_postgresql(database_name, username, password, json_file_path,
                 cur.execute(alter_table_query)
         else:
             print(f"Table '{table_name}' exists. Updating the table structure if necessary.")
+            validate_column_mismatch(cur, table_name, df)
+
+            print(f"Updating the table structure if necessary.")
             update_table_structure(cur, table_name, df)
 
         # Insert or update data into the table
@@ -527,3 +530,18 @@ def upload_json_to_postgresql(database_name, username, password, json_file_path,
     except Exception as e:
         traceback.print_exc()
         return f"Error: {str(e)}"
+def validate_column_mismatch(cur, table_name, df):
+    """
+    Compares the columns in the uploaded data frame with the columns in the existing table.
+    Raises an error if there is a mismatch (i.e., if a column in the uploaded data does not exist in the table).
+    """
+    # Get the columns in the existing table
+    cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'")
+    existing_columns = {col[0] for col in cur.fetchall()}
+
+    # Check for any columns in the uploaded data frame that are not in the existing table
+    uploaded_columns = set(df.columns)
+    missing_columns = uploaded_columns - existing_columns
+
+    if missing_columns:
+        raise ValueError(f"Column(s) {', '.join(missing_columns)} in the uploaded data do not exist in the table '{table_name}'.")

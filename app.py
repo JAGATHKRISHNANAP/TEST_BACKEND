@@ -436,18 +436,47 @@ def handle_bar_click():
 
     return jsonify({"categories": labels, "values": y_axis_values, "aggregation": aggregation})
 
-@app.route('/plot_chart/<selectedTable>/<columnName>', methods=['POST','GET'])
-def get_filter_options(selectedTable, columnName):
-    table_name=selectedTable
-    column_name=columnName
-    db_nameeee= request.args.get('databaseName')
+# @app.route('/plot_chart/<selectedTable>/<columnName>', methods=['POST','GET'])
+# def get_filter_options(selectedTable, columnName):
+#     table_name=selectedTable
+#     column_name=columnName
+#     db_nameeee= request.args.get('databaseName')
     
-    print("table_name====================",table_name)
-    print("db_nameeee====================",db_nameeee)
-    print("column_name====================",column_name)
-    column_data=fetch_column_name(table_name, column_name, db_nameeee)
-    print("column_data====================",column_data)
+#     print("table_name====================",table_name)
+#     print("db_nameeee====================",db_nameeee)
+#     print("column_name====================",column_name)
+#     column_data=fetch_column_name(table_name, column_name, db_nameeee)
+#     print("column_data====================",column_data)
+#     return jsonify(column_data)
+
+from functools import lru_cache
+@app.route('/plot_chart/<selectedTable>/<columnName>', methods=['POST', 'GET'])
+def get_filter_options(selectedTable, columnName):
+    table_name = selectedTable
+    column_name = columnName
+    db_name = request.args.get('databaseName')
+
+    print("table_name====================", table_name)
+    print("db_name====================", db_name)
+    print("column_name====================", column_name)
+
+    # Fetch data from cache or database
+    column_data = fetch_column_name_with_cache(table_name, column_name, db_name)
+    
+    print("column_data====================", column_data)
     return jsonify(column_data)
+
+
+@lru_cache(maxsize=128)
+def fetch_column_name_with_cache(table_name, column_name, db_name):
+    print("Fetching from database...")
+    return fetch_column_name(table_name, column_name, db_name)
+@app.route('/clear_cache', methods=['POST'])
+def clear_cache():
+    fetch_column_name_with_cache.cache_clear()
+    return jsonify({"message": "Cache cleared!"})
+
+
 
 def create_table():
     try:
