@@ -12,7 +12,9 @@ def sanitize_column_name(col_name):
         return col_name 
 
 def clean_data(df):
-    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    # df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.apply(lambda col: col.map(lambda x: x.strip() if isinstance(x, str) else x))
+
     return df
 
 def identify_primary_key(df):
