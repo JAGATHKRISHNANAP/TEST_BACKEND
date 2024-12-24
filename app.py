@@ -117,10 +117,11 @@ def upload_file_excel():
     excel_file.save(temp_file_path)
     
     result=upload_excel_to_postgresql(database_name, username, password, temp_file_path, primary_key_column, host, port,selected_sheets)
+    print("result====================",result)
     if result == "Upload successful":
         return jsonify({'message': 'File uploaded successfully'}), 200
     else:
-        return jsonify({'message': result}), 500
+        return jsonify({'message': result}), 200
 
 
 @app.route('/uploadcsv', methods=['POST'])
@@ -234,6 +235,7 @@ def get_bar_chart_route():
 
     if len(y_axis_columns) == 1:
         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        print("Data for single y-axis column:------------------------------------------------------------------------", data)
         
         if aggregation == "count":
             print("Data for count aggregation:", data)
@@ -311,21 +313,8 @@ def get_edit_chart_route():
     checked_option = data['filterOptions'] 
     db_nameeee = data['databaseName']
     print(".......................................",data)
-    # if len(y_axis_columns) == 1:
-    #     data = edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
-    #     print("data====================", data)     
-    #     categories = {}  
-    #     for row in data:
-    #         category = tuple(row[:-1])
-    #         y_axis_value = row[-1]
-    #         if category not in categories:
-    #             categories[category] = initial_value(aggregation)
-    #         update_category(categories, category, y_axis_value, aggregation)      
-    #     labels = [', '.join(category) for category in categories.keys()]  
-    #     values = list(categories.values())
-    #     print("labels====================", labels)
-    #     print("values====================", values)
-    #     return jsonify({"categories": labels, "values": values, "aggregation": aggregation})
+    print("Checked option====================", checked_option)
+
     if len(y_axis_columns) == 1:
         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
         
