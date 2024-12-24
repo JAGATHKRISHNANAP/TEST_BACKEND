@@ -2113,6 +2113,69 @@ def check_table_usage():
     return jsonify({"isInUse": is_in_use})
 
 
+
+
+# @app.route('/api/fetchTableDetails', methods=['GET'])
+# def get_table_data():
+#     company_name = request.args.get('databaseName')  # Get company name from the query
+#     table_name = request.args.get('selectedTable')  # Get the table name from the query
+    
+#     if not company_name or not table_name:
+#         return jsonify({'error': 'Database name and table name are required'}), 400
+
+#     try:
+#         # Connect to the database
+#         connection = get_company_db_connection(company_name)
+#         cursor = connection.cursor(cursor_factory=RealDictCursor)
+
+#         # Dynamically select the database schema
+#         cursor.execute(f'SET search_path TO {company_name};')
+
+#         # Query the selected table
+#         cursor.execute(f'SELECT * FROM {table_name};')
+#         rows = cursor.fetchall()
+
+#         # Close the connection
+#         cursor.close()
+#         connection.close()
+
+#         # Return the fetched data as JSON
+#         return jsonify(rows)
+
+#     except Exception as e:
+#         # Log the error for better debugging
+#         print(f"Error: {e}")
+#         return jsonify({'error': str(e)}), 500
+@app.route('/api/fetchTableDetails', methods=['GET'])
+def get_table_data():
+    company_name = request.args.get('databaseName')  # Get company name from the query
+    table_name = request.args.get('selectedTable')  # Get the table name from the query
+    
+    if not company_name or not table_name:
+        return jsonify({'error': 'Database name and table name are required'}), 400
+
+    try:
+        # Connect to the database
+        connection = get_company_db_connection(company_name)
+        cursor = connection.cursor(cursor_factory=RealDictCursor)
+
+        # Query the selected table
+        cursor.execute(f'SELECT * FROM {table_name};')
+        rows = cursor.fetchall()
+
+        # Close the connection
+        cursor.close()
+        connection.close()
+
+        # Return the fetched data as JSON
+        return jsonify(rows)
+
+    except Exception as e:
+        # Log the error for better debugging
+        print(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True)
    
