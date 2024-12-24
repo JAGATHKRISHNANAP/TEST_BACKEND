@@ -1,3 +1,4 @@
+# 24-12-2024
 import re
 import psycopg2
 import pandas as pd
@@ -419,6 +420,7 @@ def count_function(table_name, x_axis_columns, checked_option, y_axis_column, ag
 #     result = [tuple(x) for x in grouped_df.to_numpy()]
 #     print("result:", result)
 #     return result
+
 
 
 def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
