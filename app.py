@@ -96,6 +96,33 @@ def test_db():
 
 
 
+# @app.route('/uploadexcel', methods=['POST'])
+# def upload_file_excel():
+#     # database_name='excel_database'
+#     database_name = request.form.get('company_database') 
+#     # database_name = request.form.get('databaseName')
+#     excel_file = request.files['file']
+#     primary_key_column = request.form.get('primaryKeyColumnName')
+#     selected_sheets = request.form.getlist('selectedSheets')  # New addition
+
+#     print("database_name=============111111111111111111111111", database_name)
+#     print("method=============", request.method)
+#     print("files==============", request.files)
+#     print("primary_key_column====================", primary_key_column) 
+    
+#     print("selected_sheets ", selected_sheets)
+#     excel_file_name = secure_filename(excel_file.filename)
+#     os.makedirs('tmp', exist_ok=True)
+#     temp_file_path = f'tmp/{excel_file_name}'
+#     excel_file.save(temp_file_path)
+    
+    
+#     result=upload_excel_to_postgresql(database_name, username, password, temp_file_path, primary_key_column, host, port,selected_sheets)
+#     print("result====================",result)
+#     if result == "Upload successful":
+#         return jsonify({'message': 'File uploaded successfully'}), 200
+#     else:
+#         return jsonify({'message': result}), 200
 @app.route('/uploadexcel', methods=['POST'])
 def upload_file_excel():
     # database_name='excel_database'
@@ -103,6 +130,7 @@ def upload_file_excel():
     # database_name = request.form.get('databaseName')
     excel_file = request.files['file']
     primary_key_column = request.form.get('primaryKeyColumnName')
+
     selected_sheets = request.form.getlist('selectedSheets')  # New addition
 
     print("database_name=============111111111111111111111111", database_name)
@@ -116,13 +144,12 @@ def upload_file_excel():
     temp_file_path = f'tmp/{excel_file_name}'
     excel_file.save(temp_file_path)
     
-    
     result=upload_excel_to_postgresql(database_name, username, password, temp_file_path, primary_key_column, host, port,selected_sheets)
-    print("result====================",result)
     if result == "Upload successful":
-        return jsonify({'message': 'File uploaded successfully'}), 200
+        return jsonify({'message': 'File uploaded successfully','status':True}), 200
     else:
-        return jsonify({'message': result}), 200
+        print("result====================",result)
+        return jsonify({'message': result,'status':False}), 500
 
 
 @app.route('/uploadcsv', methods=['POST'])
@@ -246,6 +273,12 @@ def get_bar_chart_route():
             print("Array2:", array2)
             
             # Return the JSON response for count aggregation
+            return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
+        elif aggregation == "average":
+            array1 = [item[0] for item in data]
+            array2 = [item[1] for item in data]
+            print("Array1:", array1)
+            print("Array2:", array2)
             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
         
         # For other aggregation types
