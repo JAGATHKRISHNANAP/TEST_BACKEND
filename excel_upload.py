@@ -43,6 +43,8 @@ def check_repeating_columns(df):
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'excel')
 
+
+
 def upload_excel_to_postgresql(database_name, username, password, excel_file_name, primary_key_column, host='localhost', port='5432', selected_sheets=None):
     try:
         current_dir = os.getcwd()
@@ -170,6 +172,10 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
 
             # Iterate over rows in the DataFrame and insert new or updated rows
             for _, row in df.iterrows():
+                for col in df.select_dtypes(include=['datetime']).columns:
+                    if pd.isna(row[col]):
+                        row[col] = None  # Replace invalid dates with None (NULL)
+
                 insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
                     sql.Identifier(table_name),
                     sql.SQL(', ').join(map(sql.Identifier, df.columns)),

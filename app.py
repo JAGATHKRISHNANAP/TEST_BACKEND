@@ -116,6 +116,7 @@ def upload_file_excel():
     temp_file_path = f'tmp/{excel_file_name}'
     excel_file.save(temp_file_path)
     
+    
     result=upload_excel_to_postgresql(database_name, username, password, temp_file_path, primary_key_column, host, port,selected_sheets)
     print("result====================",result)
     if result == "Upload successful":
