@@ -132,6 +132,7 @@ def upload_file_excel():
     primary_key_column = request.form.get('primaryKeyColumnName')
 
     selected_sheets = request.form.getlist('selectedSheets')  # New addition
+    print("excel_file====================",excel_file)  
 
     print("database_name=============111111111111111111111111", database_name)
     print("method=============", request.method)
