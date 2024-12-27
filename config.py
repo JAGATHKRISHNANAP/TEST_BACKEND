@@ -21,7 +21,8 @@ for sub_folder in SUB_FOLDERS:
 DB_NAME = 'datasource'
 USER_NAME = 'postgres'
 PASSWORD = 'jaTHU@12'
-HOST = 'localhost'
+# HOST = 'localhost'
+HOST = '43.204.149.125'
 # HOST = 'host.docker.internal'
 
 PORT = '5432'

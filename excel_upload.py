@@ -182,7 +182,7 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
                     sql.SQL(', ').join(sql.Placeholder() for _ in df.columns)
                 )
                 cur.execute(insert_query, tuple(row))
-                print(f"Inserted row with {primary_key_column} = {row[primary_key_column]} in table '{table_name}'.")
+                # print(f"Inserted row with {primary_key_column} = {row[primary_key_column]} in table '{table_name}'.")
 
             file_name = f"{table_name}.xlsx"
             file_path = os.path.join(directory_path, file_name)
@@ -221,3 +221,176 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
     except Exception as e:
         print("An error occurred:", e)
         return f"Error: {str(e)}"
+
+
+
+# def upload_excel_to_postgresql(database_name, username, password, excel_file_name, primary_key_column, host='localhost', port='5432', selected_sheets=None):
+#     try:
+#         current_dir = os.getcwd()
+#         excel_file_path = os.path.join(current_dir, excel_file_name)
+
+#         conn = psycopg2.connect(dbname=database_name, user=username, password=password, host=host, port=port)
+#         if not excel_file_path.lower().endswith('.xlsx'):
+#             return "Error: Only Excel files with .xlsx extension are supported."
+
+#         xls = pd.ExcelFile(excel_file_path)
+
+#         directory_name = os.path.splitext(os.path.basename(excel_file_name))[0]
+#         directory_path = os.path.join(UPLOAD_FOLDER, directory_name)
+#         os.makedirs(directory_path, exist_ok=True)
+
+#         cur = conn.cursor()
+
+#         for sheet_name in selected_sheets:  
+#             sheet_name_cleaned = sheet_name.strip('"').strip()
+#             if sheet_name_cleaned not in xls.sheet_names:
+#                 print(f"Sheet '{sheet_name_cleaned}' not found in the Excel file. Skipping...")
+#                 continue
+#             df = pd.read_excel(excel_file_name, sheet_name=sheet_name_cleaned)
+#             table_name = sanitize_column_name(sheet_name_cleaned)
+#             df.columns = [sanitize_column_name(col) for col in df.columns]
+#             print(f"Columns in {sheet_name}: {df.columns}")
+    
+#             table_exists = validate_table_structure(cur, table_name, df)
+#             print(f"Table exists for {table_name}: {table_exists}")
+
+#             if table_exists:
+#                 print(f"Validating and adding missing columns to table '{table_name}'.")
+                
+#                 # Detect and add missing columns
+#                 cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}';")
+#                 existing_columns = [row[0] for row in cur.fetchall()]
+
+#                 missing_columns = [col for col in df.columns if col not in existing_columns]
+
+#                 for col in missing_columns:
+#                     # Infer column type based on data in DataFrame
+#                     if df[col].dropna().apply(lambda x: isinstance(x, str)).all():
+#                         col_type = 'VARCHAR'
+#                     elif df[col].dropna().apply(lambda x: isinstance(x, int)).all():
+#                         col_type = 'INTEGER'
+#                     elif df[col].dropna().apply(lambda x: isinstance(x, float)).all():
+#                         col_type = 'NUMERIC'
+#                     else:
+#                         col_type = 'VARCHAR'  
+
+#                     alter_query = sql.SQL('ALTER TABLE {} ADD COLUMN {} {}').format(
+#                         sql.Identifier(table_name),
+#                         sql.Identifier(col),
+#                         sql.SQL(col_type)
+#                     )
+
+#                     try:
+#                         cur.execute(alter_query)
+#                         print(f"Added column '{col}' with type '{col_type}' to table '{table_name}'.")
+#                     except Exception as e:
+#                         print(f"Error adding column '{col}' to table '{table_name}': {str(e)}")
+#                         continue
+
+#             else:
+#                 print(f"Creating table '{table_name}'.")
+                
+#                 # Determine data types based on column values
+#                 column_types = []
+#                 for col in df.columns:
+#                     if df[col].dropna().apply(lambda x: isinstance(x, str)).all():
+#                         col_type = 'VARCHAR'
+#                     elif df[col].dropna().apply(lambda x: isinstance(x, int)).all():
+#                         col_type = 'INTEGER'
+#                     elif df[col].dropna().apply(lambda x: isinstance(x, float)).all():
+#                         col_type = 'NUMERIC'
+#                     else:
+#                         col_type = 'VARCHAR'  
+
+#                     column_types.append((col, col_type))
+
+#                 columns = ', '.join(f'"{col}" {col_type}' for col, col_type in column_types)
+#                 create_table_query = sql.SQL('CREATE TABLE {} ({})').format(sql.Identifier(table_name),
+#                                                                               sql.SQL(columns))
+#                 try:
+#                     print(f"Create Table Query: {create_table_query.as_string(cur)}")
+#                     cur.execute(create_table_query)
+#                 except Exception as e:
+#                     print(f"Error creating table {table_name}: {str(e)}")
+#                     continue  
+
+#                 if primary_key_column in df.columns:
+#                     alter_table_query = sql.SQL('ALTER TABLE {} ADD PRIMARY KEY ({})').format(
+#                         sql.Identifier(table_name), sql.Identifier(primary_key_column))
+#                     try:
+#                         cur.execute(alter_table_query)
+#                     except Exception as e:
+#                         print(f"Error adding primary key to {table_name}: {str(e)}")
+#                         continue
+
+#             # Disable autocommit
+#             conn.autocommit = False
+
+#             # Disable constraints
+#             cur.execute("ALTER TABLE {} DISABLE TRIGGER ALL".format(table_name))
+
+#             # duplicate_primary_keys = df[df.duplicated(subset=[primary_key_column], keep=False)][primary_key_column
+#             duplicate_primary_keys = df[df.duplicated(subset=[primary_key_column], keep=False)][primary_key_column].tolist()
+#             if duplicate_primary_keys:
+#                 return f"Error: Duplicate primary key values found: {', '.join(map(str, duplicate_primary_keys))}"
+
+#             # Create a list to store the rows to be inserted
+#             rows_to_insert = []
+
+#             # Iterate over rows in the DataFrame
+#             for _, row in df.iterrows():
+#                 # Append the row to the list
+#                 rows_to_insert.append(tuple(row))
+
+#             # Perform batch insert using copy_from
+#             buffer = StringIO()
+#             df.to_csv(buffer, index=False, header=False)
+#             buffer.seek(0)
+#             cur.copy_from(buffer, table_name, sep=',', columns=df.columns)
+
+#             # Commit the changes
+#             conn.commit()
+
+#             # Re-enable constraints
+#             cur.execute("ALTER TABLE {} ENABLE TRIGGER ALL".format(table_name))
+
+#             # Re-enable autocommit
+#             conn.autocommit = True
+
+#             file_name = f"{table_name}.xlsx"
+#             file_path = os.path.join(directory_path, file_name)
+#             df.to_excel(file_path, index=False)
+
+#         cur.execute("""
+#             SELECT EXISTS (
+#                 SELECT FROM pg_tables 
+#                 WHERE schemaname = 'public' 
+#                 AND tablename = 'datasource'
+#             );
+#         """)
+#         table_exists = cur.fetchone()[0]
+
+#         if not table_exists:
+#             cur.execute("""
+#                 CREATE TABLE datasource (
+#                     id SERIAL PRIMARY KEY,
+#                     data_source_name VARCHAR(255),
+#                     data_source_path VARCHAR(255)
+#                 );
+#             """)
+#             print("Created 'datasource' table.")
+
+#         insert_query = sql.SQL("""
+#                     INSERT INTO datasource (data_source_name, data_source_path)
+#                     VALUES (%s, %s)
+#                 """)
+#         cur.execute(insert_query, (directory_name, directory_path))
+#         conn.commit()
+
+#         cur.close()
+#         conn.close()
+
+#         return "Upload successful"
+#     except Exception as e:
+#         print("An error occurred:", e)
+#         return f"Error: {str(e)}"

@@ -112,7 +112,7 @@ def remove_symbols(value):
 #         print("Error: Unable to connect to the database.")
 #         print(e)
 #         return {'numeric_columns': [], 'text_columns': []}
-def get_column_names(db_name, username, password, table_name, host='localhost', port='5432'):
+def get_column_names(db_name, username, password, table_name, host, port='5432'):
     global global_df
     oldtablename = getattr(get_column_names, 'oldtablename', None)
     
@@ -163,9 +163,9 @@ def get_column_names(db_name, username, password, table_name, host='localhost', 
         df = pd.DataFrame(data, columns=column_names)
         global_df = df
         get_column_names.oldtablename = table_name  # Update the oldtablename to the current table_name
-        print("============================database data frame============================")
-        print(global_df.head(5))
-        print("========================================================")
+        # print("============================database data frame============================")
+        # print(global_df.head(5))
+        # print("========================================================")
 
         print("All column names in the dataframe:")
         print(df.columns.tolist())
@@ -186,13 +186,13 @@ def get_column_names(db_name, username, password, table_name, host='localhost', 
             cleaned_values = df[column_name].apply(remove_symbols).tolist()
             numeric_columns_cleaned[column_name] = cleaned_values
             num_columns = list(numeric_columns_cleaned.keys())
-            print("numeric columns", num_columns)
+            # print("numeric columns", num_columns)
 
         for column_name in text_columns:
             cleaned_values = df[column_name].apply(remove_symbols).tolist()
             text_columns_cleaned[column_name] = cleaned_values
             txt_columns = list(text_columns_cleaned.keys())
-            print("text columns", txt_columns)
+            # print("text columns", txt_columns)
 
         cursor.close()
         conn.close()
