@@ -1,0 +1,86 @@
+2024-12-27 22:35:43,076 - WARNING -  * Debugger is active!
+2024-12-27 22:35:43,083 - INFO -  * Debugger PIN: 132-587-628
+2024-12-27 22:35:46,896 - INFO -  * Detected change in 'C:\\Users\\hp\\Desktop\\New folder\\data visulization\\backend\\config.py', reloading
+2024-12-27 22:35:52,404 - WARNING -  * Debugger is active!
+2024-12-27 22:35:52,408 - INFO -  * Debugger PIN: 132-587-628
+2024-12-27 22:36:30,824 - INFO - 127.0.0.1 - - [27/Dec/2024 22:36:30] "GET /table_names?databaseName=redmi HTTP/1.1" 200 -
+2024-12-27 22:37:14,844 - INFO - 127.0.0.1 - - [27/Dec/2024 22:37:14] "GET /api/companies HTTP/1.1" 200 -
+2024-12-27 22:37:16,671 - INFO - 127.0.0.1 - - [27/Dec/2024 22:37:16] "OPTIONS /api/login HTTP/1.1" 200 -
+2024-12-27 22:37:17,778 - INFO - 127.0.0.1 - - [27/Dec/2024 22:37:17] "POST /api/login HTTP/1.1" 200 -
+2024-12-27 22:37:20,916 - INFO - 127.0.0.1 - - [27/Dec/2024 22:37:20] "GET /table_names?databaseName=redmi HTTP/1.1" 200 -
+2024-12-27 22:37:22,369 - INFO - 127.0.0.1 - - [27/Dec/2024 22:37:22] "GET /table_names?databaseName=redmi HTTP/1.1" 200 -
+2024-12-27 22:38:01,257 - INFO - 127.0.0.1 - - [27/Dec/2024 22:38:01] "GET /table_names?databaseName=redmi HTTP/1.1" 200 -
+2024-12-27 22:38:01,462 - INFO - Connecting to the database...
+2024-12-27 22:38:03,133 - INFO - Opened Excel file: tmp/gym_excel.xlsx
+2024-12-27 22:38:15,910 - INFO - Processing sheet: GYM, Table: gym, Columns: Index(['serial_no', 'number_people', 'day_of_week', 'is_weekend', 'is_holiday',
+       'temperature', 'is_start_of_semester', 'is_during_semester', 'month',
+       'hour'],
+      dtype='object')
+2024-12-27 22:38:16,004 - INFO - Creating table 'gym'...
+2024-12-27 22:40:52,893 - INFO -  * Detected change in 'C:\\Users\\hp\\Desktop\\New folder\\data visulization\\backend\\excel_upload.py', reloading
+2024-12-27 22:41:01,526 - WARNING -  * Debugger is active!
+2024-12-27 22:41:01,534 - INFO -  * Debugger PIN: 132-587-628
+2024-12-27 22:41:01,783 - INFO - Connecting to the database...
+2024-12-27 22:41:02,464 - INFO - 127.0.0.1 - - [27/Dec/2024 22:41:02] "GET /api/companies HTTP/1.1" 200 -
+2024-12-27 22:41:02,668 - INFO - Opened Excel file: tmp/gym_excel.xlsx
+2024-12-27 22:41:06,908 - INFO - Processing sheet: GYM, Table: gym, Columns: Index(['serial_no', 'number_people', 'day_of_week', 'is_weekend', 'is_holiday',
+       'temperature', 'is_start_of_semester', 'is_during_semester', 'month',
+       'hour'],
+      dtype='object')
+2024-12-27 22:41:07,012 - INFO - Creating table 'gym'...
+2024-12-27 22:41:10,493 - INFO - 127.0.0.1 - - [27/Dec/2024 22:41:10] "OPTIONS /api/login HTTP/1.1" 200 -
+2024-12-27 22:41:11,562 - INFO - 127.0.0.1 - - [27/Dec/2024 22:41:11] "POST /api/login HTTP/1.1" 200 -
+2024-12-27 22:41:23,964 - INFO - 127.0.0.1 - - [27/Dec/2024 22:41:23] "GET /table_names?databaseName=redmi HTTP/1.1" 200 -
+2024-12-27 22:41:26,045 - INFO - Connecting to the database...
+2024-12-27 22:41:26,351 - INFO - Opened Excel file: tmp/Book11_Autosavedk.xlsx
+2024-12-27 22:41:26,393 - INFO - Processing sheet: Testing Details, Table: testing_details, Columns: Index(['serial_no', 'module', 'test_case', 'excepted_behaviour',
+       'test_case_type', 'status', 'testcase_created', 'testcase_tested',
+       'issue_fixed_or_not', 'issue_fixed_date', 'priority'],
+      dtype='object')
+2024-12-27 22:41:26,481 - INFO - Table 'testing_details' already exists. Adding missing columns if any...
+2024-12-27 22:41:26,784 - INFO - 127.0.0.1 - - [27/Dec/2024 22:41:26] "[35m[1mPOST /uploadexcel HTTP/1.1[0m" 500 -
+2024-12-27 22:42:47,269 - INFO -  * Detected change in 'C:\\Users\\hp\\Desktop\\New folder\\data visulization\\backend\\excel_upload.py', reloading
+2024-12-27 22:42:52,916 - WARNING -  * Debugger is active!
+2024-12-27 22:42:52,921 - INFO -  * Debugger PIN: 132-587-628
+2024-12-27 22:43:08,198 - INFO - 127.0.0.1 - - [27/Dec/2024 22:43:08] "GET /api/companies HTTP/1.1" 200 -
+2024-12-27 22:43:10,258 - INFO - 127.0.0.1 - - [27/Dec/2024 22:43:10] "OPTIONS /api/login HTTP/1.1" 200 -
+2024-12-27 22:43:11,335 - INFO - 127.0.0.1 - - [27/Dec/2024 22:43:11] "POST /api/login HTTP/1.1" 200 -
+2024-12-27 22:43:26,313 - INFO - 127.0.0.1 - - [27/Dec/2024 22:43:26] "GET /table_names?databaseName=redmi HTTP/1.1" 200 -
+2024-12-27 22:43:27,875 - INFO - Connecting to the database...
+2024-12-27 22:43:28,503 - INFO - Opened Excel file: tmp/Book11_Autosavedk.xlsx
+2024-12-27 22:43:28,555 - INFO - Processing sheet: Testing Details, Table: testing_details, Columns: Index(['serial_no', 'module', 'test_case', 'excepted_behaviour',
+       'test_case_type', 'status', 'testcase_created', 'testcase_tested',
+       'issue_fixed_or_not', 'issue_fixed_date', 'priority'],
+      dtype='object')
+2024-12-27 22:43:28,752 - ERROR - An error occurred: Traceback (most recent call last):
+  File "C:\Users\hp\Desktop\New folder\data visulization\backend\excel_upload.py", line 381, in upload_excel_to_postgresql
+    batch_insert(cur, table_name, df)
+  File "C:\Users\hp\Desktop\New folder\data visulization\backend\excel_upload.py", line 259, in batch_insert
+    execute_values(cur, insert_query, rows)
+  File "C:\Users\hp\Desktop\New folder\data visulization\backend\venv\lib\site-packages\psycopg2\extras.py", line 1299, in execute_values
+    cur.execute(b''.join(parts))
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "testing_details_pkey"
+DETAIL:  Key (serial_no)=(1) already exists.
+
+
+2024-12-27 22:43:28,753 - INFO - 127.0.0.1 - - [27/Dec/2024 22:43:28] "[35m[1mPOST /uploadexcel HTTP/1.1[0m" 500 -
+2024-12-27 22:43:35,812 - INFO - 127.0.0.1 - - [27/Dec/2024 22:43:35] "GET /table_names?databaseName=redmi HTTP/1.1" 200 -
+2024-12-27 22:43:36,839 - INFO - Connecting to the database...
+2024-12-27 22:43:37,192 - INFO - Opened Excel file: tmp/Book11_Autosavedk.xlsx
+2024-12-27 22:43:37,229 - INFO - Processing sheet: Testing Details, Table: testing_details, Columns: Index(['serial_no', 'module', 'test_case', 'excepted_behaviour',
+       'test_case_type', 'status', 'testcase_created', 'testcase_tested',
+       'issue_fixed_or_not', 'issue_fixed_date', 'priority'],
+      dtype='object')
+2024-12-27 22:43:37,412 - ERROR - An error occurred: Traceback (most recent call last):
+  File "C:\Users\hp\Desktop\New folder\data visulization\backend\excel_upload.py", line 381, in upload_excel_to_postgresql
+    batch_insert(cur, table_name, df)
+  File "C:\Users\hp\Desktop\New folder\data visulization\backend\excel_upload.py", line 259, in batch_insert
+    execute_values(cur, insert_query, rows)
+  File "C:\Users\hp\Desktop\New folder\data visulization\backend\venv\lib\site-packages\psycopg2\extras.py", line 1299, in execute_values
+    cur.execute(b''.join(parts))
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "testing_details_pkey"
+DETAIL:  Key (serial_no)=(1) already exists.
+
+
+2024-12-27 22:43:37,413 - INFO - 127.0.0.1 - - [27/Dec/2024 22:43:37] "[35m[1mPOST /uploadexcel HTTP/1.1[0m" 500 -
+2024-12-27 22:44:24,675 - INFO -  * Detected change in 'C:\\Users\\hp\\Desktop\\New folder\\data visulization\\backend\\excel_upload.py', reloading

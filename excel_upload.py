@@ -4,9 +4,7 @@ import psycopg2
 import re
 from psycopg2 import sql
 import traceback
-
-
-
+from tqdm import tqdm
 
 # Function to sanitize column names (replace spaces and special characters with underscores)
 def sanitize_column_name(col_name):
@@ -151,10 +149,29 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
             if duplicate_primary_keys:
                 return f"Error: Duplicate primary key values found: {', '.join(map(str, duplicate_primary_keys))}"
 
-            # Delete rows with matching primary key values in bulk
-            primary_key_values = df[primary_key_column].tolist()
+            # # Delete rows with matching primary key values in bulk
+            # primary_key_values = df[primary_key_column].tolist()
+            # # delete_query = sql.SQL("DELETE FROM {} WHERE {} IN (%s)").format(
+            # #     sql.Identifier(table_name),
+            # #     sql.Identifier(primary_key_column)
+            # # )
+            # # cur.execute(delete_query, (primary_key_values,))
+            # # Convert the list of primary key values to a tuple
+            # primary_key_values_tuple = tuple(primary_key_values)
 
-            primary_key_values_tuple = tuple(primary_key_values)
+            # # Delete rows with matching primary key values in bulk
+            # delete_query = sql.SQL("DELETE FROM {} WHERE {} IN ({})").format(
+            #     sql.Identifier(table_name),
+            #     sql.Identifier(primary_key_column),
+            #     sql.SQL(', ').join([sql.Placeholder()] * len(primary_key_values_tuple))  # Placeholder for each primary key value
+            # )
+
+            # # Execute the DELETE query with primary key values as arguments
+            # cur.execute(delete_query, primary_key_values_tuple)
+
+            # print(f"Deleted {len(primary_key_values)} rows with matching primary key values in table '{table_name}'.")
+            # Convert the list of primary key values to a tuple
+            primary_key_values_tuple = tuple(df[primary_key_column].tolist())
 
             # Delete rows with matching primary key values in bulk
             delete_query = sql.SQL("DELETE FROM {} WHERE {} IN ({})").format(
@@ -166,21 +183,87 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
             # Execute the DELETE query with primary key values as arguments
             cur.execute(delete_query, primary_key_values_tuple)
 
-            print(f"Deleted {len(primary_key_values)} rows with matching primary key values in table '{table_name}'.")
+            # Check if rows were deleted
+            if cur.rowcount > 0:
+                print(f"Deleted {cur.rowcount} rows with matching primary key values in table '{table_name}'.")
+            else:
+                print("No rows were deleted.")
 
-            # Iterate over rows in the DataFrame and insert new or updated rows
+
+
+            # # Iterate over rows in the DataFrame and insert new or updated rows
+            # for _, row in df.iterrows():
+            #     for col in df.select_dtypes(include=['datetime']).columns:
+            #         if pd.isna(row[col]):
+            #             row[col] = None  # Replace invalid dates with None (NULL)
+
+            #     insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+            #         sql.Identifier(table_name),
+            #         sql.SQL(', ').join(map(sql.Identifier, df.columns)),
+            #         sql.SQL(', ').join(sql.Placeholder() for _ in df.columns)
+            #     )
+            #     cur.execute(insert_query, tuple(row))
+            #     print(f"Inserted row with {primary_key_column} = {row[primary_key_column]} in table '{table_name}'.")
+            
+            
+            
+            # Prepare rows for batch insertion
+            rows_to_insert = []
             for _, row in df.iterrows():
                 for col in df.select_dtypes(include=['datetime']).columns:
                     if pd.isna(row[col]):
                         row[col] = None  # Replace invalid dates with None (NULL)
+                rows_to_insert.append(tuple(row))
 
-                insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                    sql.Identifier(table_name),
-                    sql.SQL(', ').join(map(sql.Identifier, df.columns)),
-                    sql.SQL(', ').join(sql.Placeholder() for _ in df.columns)
-                )
-                cur.execute(insert_query, tuple(row))
-                print(f"Inserted row with {primary_key_column} = {row[primary_key_column]} in table '{table_name}'.")
+            # Batch insert into the database with progress tracking
+            placeholders = ', '.join(['%s'] * len(df.columns))
+            batch_insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                sql.Identifier(table_name),
+                sql.SQL(', ').join(map(sql.Identifier, df.columns)),
+                sql.SQL(placeholders)
+            )
+
+            try:
+                # Define batch size for inserts
+                batch_size = 1000
+                total_batches = (len(rows_to_insert) + batch_size - 1) // batch_size  # Ceiling division
+
+                with tqdm(total=len(rows_to_insert), desc="Inserting rows", unit="row") as pbar:
+                    for i in range(0, len(rows_to_insert), batch_size):
+                        batch = rows_to_insert[i:i + batch_size]
+                        cur.executemany(batch_insert_query.as_string(conn), batch)
+                        conn.commit()  # Commit after each batch
+                        pbar.update(len(batch))  # Update the progress bar
+
+                print(f"Batch inserted {len(rows_to_insert)} rows into table '{table_name}'.")
+            except Exception as e:
+                print(f"Error during batch insert: {str(e)}")
+
+
+
+
+            # rows_to_insert = []
+            # for _, row in df.iterrows():
+            #     for col in df.select_dtypes(include=['datetime']).columns:
+            #         if pd.isna(row[col]):
+            #             row[col] = None  # Replace invalid dates with None (NULL)
+            #     rows_to_insert.append(tuple(row))
+
+            # # Batch insert into the database
+            # placeholders = ', '.join(['%s'] * len(df.columns))
+            # batch_insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+            #     sql.Identifier(table_name),
+            #     sql.SQL(', ').join(map(sql.Identifier, df.columns)),
+            #     sql.SQL(placeholders)
+            # )
+
+            # try:
+            #     # Execute the batch insert
+            #     cur.executemany(batch_insert_query.as_string(conn), rows_to_insert)
+            #     print(f"Batch inserted {len(rows_to_insert)} rows into table '{table_name}'.")
+            # except Exception as e:
+            #     print(f"Error during batch insert: {str(e)}")
+
 
             file_name = f"{table_name}.xlsx"
             file_path = os.path.join(directory_path, file_name)
@@ -219,6 +302,8 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
     except Exception as e:
         print("An error occurred:", e)
         return f"Error: {str(e)}"
+
+
 
 
 
