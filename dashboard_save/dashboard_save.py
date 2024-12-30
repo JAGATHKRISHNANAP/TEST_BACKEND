@@ -102,9 +102,9 @@ def get_company_db_connection(company_name):
     )
     return conn 
 
-def get_dashboard_names(user_id, company_name_global):
+def get_dashboard_names(user_id, database_name):
     # Step 1: Get employees reporting to the given user_id from the company database.
-    conn_company = get_company_db_connection(company_name_global)
+    conn_company = get_company_db_connection(database_name)
     reporting_employees = []
 
     if conn_company:
@@ -120,7 +120,7 @@ def get_dashboard_names(user_id, company_name_global):
                 if column_exists:
                     # Fetch employees who report to the given user_id (including NULL reporting_id if not assigned).
                     cursor.execute("""
-                        # SELECT employee_id FROM employee_list WHERE reporting_id = %s 
+                         SELECT employee_id FROM employee_list WHERE reporting_id = %s 
                     """, (user_id,))
                     reporting_employees = [row[0] for row in cursor.fetchall()]
         except psycopg2.Error as e:
@@ -146,7 +146,7 @@ def get_dashboard_names(user_id, company_name_global):
                     WHERE user_id IN ({placeholders}) and company_name = %s
                 """
                 # cursor.execute(query, tuple(all_employee_ids))
-                cursor.execute(query, tuple(map(str, all_employee_ids))+ (company_name_global,))
+                cursor.execute(query, tuple(map(str, all_employee_ids))+ (database_name,))
                 dashboards = cursor.fetchall()
 
                 # Organize dashboards by user_id

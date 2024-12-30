@@ -246,8 +246,34 @@ def sanitize_column_name(name):
     # Function to sanitize column names (e.g., remove spaces, special characters)
     return name.strip().replace(" ", "_").lower()
 
+# def determine_sql_data_type(series):
+#     # Function to determine the SQL data type based on pandas dtype
+#     if pd.api.types.is_integer_dtype(series):
+#         return 'INTEGER'
+#     elif pd.api.types.is_float_dtype(series):
+#         return 'FLOAT'
+#     elif pd.api.types.is_bool_dtype(series):
+#         return 'BOOLEAN'
+#     elif pd.api.types.is_datetime64_any_dtype(series):
+#         return 'TIMESTAMP'
+#     else:
+#         return 'VARCHAR'
+
+# def convert_to_correct_type(value, expected_type):
+#     # Function to convert values to the correct SQL type based on expected type
+#     if expected_type == 'INTEGER':
+#         return int(value)
+#     elif expected_type == 'FLOAT':
+#         return float(value)
+#     elif expected_type == 'BOOLEAN':
+#         return bool(value)
+#     elif expected_type == 'TIMESTAMP':
+#         return pd.to_datetime(value)
+#     else:
+#         return str(value)
 def determine_sql_data_type(series):
-    # Function to determine the SQL data type based on pandas dtype
+    # Function to determine the SQL data type based on pandas dtype and patterns
+    date_pattern = r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$"
     if pd.api.types.is_integer_dtype(series):
         return 'INTEGER'
     elif pd.api.types.is_float_dtype(series):
@@ -256,21 +282,28 @@ def determine_sql_data_type(series):
         return 'BOOLEAN'
     elif pd.api.types.is_datetime64_any_dtype(series):
         return 'TIMESTAMP'
+    elif series.dtype == 'object' and series.str.match(date_pattern).any():
+        return 'TIMESTAMP'
     else:
         return 'VARCHAR'
-
 def convert_to_correct_type(value, expected_type):
     # Function to convert values to the correct SQL type based on expected type
-    if expected_type == 'INTEGER':
-        return int(value)
-    elif expected_type == 'FLOAT':
-        return float(value)
-    elif expected_type == 'BOOLEAN':
-        return bool(value)
-    elif expected_type == 'TIMESTAMP':
-        return pd.to_datetime(value)
-    else:
-        return str(value)
+    try:
+        if expected_type == 'INTEGER':
+            return int(value)
+        elif expected_type == 'FLOAT':
+            return float(value)
+        elif expected_type == 'BOOLEAN':
+            return bool(value)
+        elif expected_type == 'TIMESTAMP':
+            # Convert date-like strings to pandas Timestamp
+            return pd.to_datetime(value, errors='coerce', infer_datetime_format=True)
+        else:
+            return str(value)
+    except (ValueError, TypeError):
+        # Return None if conversion fails
+        return None
+
 
 def validate_table_structure(cur, table_name):
     # Check if table exists in the database

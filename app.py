@@ -128,9 +128,9 @@ def upload_file_excel():
     
     result=upload_excel_to_postgresql(database_name, username, password, temp_file_path, primary_key_column, host, port,selected_sheets)
     if result == "Upload successful":
-        return jsonify({'message': 'File uploaded successfully'}), 200
+        return jsonify({'message': 'File uploaded successfully','status':True}), 200
     else:
-        return jsonify({'message': result}), 500
+        return jsonify({'message': result,'status':False}), 500
 
 
 @app.route('/uploadcsv', methods=['POST'])
@@ -627,9 +627,10 @@ def connect_to_db():
         print("Error connecting to the database:", e)
         return None
 
-def get_chart_names(user_id, company_name_global):
+def get_chart_names(user_id, database_name):
     # Step 1: Get employees reporting to the given user_id from the company database.
-    conn_company = get_company_db_connection(company_name_global)
+    conn_company = get_company_db_connection(database_name)
+    print("company",database_name)
     reporting_employees = []
 
     if conn_company:
@@ -667,12 +668,12 @@ def get_chart_names(user_id, company_name_global):
             with conn_datasource.cursor() as cursor:
                 # Create placeholders for the IN clause
                 placeholders = ', '.join(['%s'] * len(all_employee_ids))
-                
+                print("placeholders",placeholders)
                 query = f"""
                     SELECT user_id, chart_name FROM new_dashboard_details_new
                     WHERE user_id IN ({placeholders}) and company_name = %s
                 """
-                cursor.execute(query, tuple(all_employee_ids)+ (company_name_global,))
+                cursor.execute(query, tuple(all_employee_ids)+ (database_name,))
                 print("query",query)
                 charts = cursor.fetchall()
                 print("charts",charts)
@@ -691,24 +692,52 @@ def get_chart_names(user_id, company_name_global):
 
 
 
+# @app.route('/total_rows', methods=['GET'])
+# def chart_names():
+#     global company_name_global
+#     user_id = request.args.get('user_id')
+#     print("user_id====================", user_id)  
+#     print()
+#     try:
+#         user_id = int(user_id)  # Convert to integer
+#     except ValueError:
+#         return jsonify({'error': 'Invalid user_id. Must be an integer.'})
+
+#     names = get_chart_names(user_id, company_name_global)
+#     print("names====================", names)   
+#     if names is not None:
+#         return jsonify({'chart_names': names})
+#     else:
+#         return jsonify({'error': 'Failed to fetch chart names'})
+
+
 @app.route('/total_rows', methods=['GET'])
 def chart_names():
-    global company_name_global
     user_id = request.args.get('user_id')
-    print("user_id====================", user_id)  
+    database_name = request.args.get('company')  # Getting the database_name
 
+    print("user_id====================", user_id)
+    print("database_name====================", database_name)
+
+    # Validate the user_id
     try:
         user_id = int(user_id)  # Convert to integer
     except ValueError:
         return jsonify({'error': 'Invalid user_id. Must be an integer.'})
 
-    names = get_chart_names(user_id, company_name_global)
-    print("names====================", names)   
+    # Check if the database_name is valid (you can extend this validation if needed)
+    if not database_name:
+        return jsonify({'error': 'Invalid or missing database_name.'})
+
+    # Pass the user_id and database_name to the get_chart_names function
+    names = get_chart_names(user_id, database_name)
+
+    print("names====================", names)
+
     if names is not None:
         return jsonify({'chart_names': names})
     else:
         return jsonify({'error': 'Failed to fetch chart names'})
-
 
 def get_chart_data(chart_name):
     print("chart_id====================......................................................",chart_name)
@@ -1342,14 +1371,15 @@ def dashboard_data(dashboard_name):
 
 @app.route('/saved_dashboard_total_rows', methods=['GET'])
 def saved_dashboard_names():
-    global company_name_global
+    database_name = request.args.get('company')  # Getting the database_name
+    print(f"Received user_id:",database_name)
     user_id = request.args.get('user_id')  # Retrieve user_id from query parameters
 
     print(f"Received user_id: {user_id}")  # Debugging output
     if not user_id:
         return jsonify({'error': 'User ID is required'}), 400
 
-    names = get_dashboard_names(user_id,company_name_global)
+    names = get_dashboard_names(user_id,database_name)
     
     print("names====================", names)   
     if names is not None:
@@ -1888,74 +1918,6 @@ def delete_dashboard_name():
 
 
 
-# @app.route('/api/is-chart-in-dashboard', methods=['GET'])
-# def is_chart_in_dashboard():
-#     chart_name = request.args.get('chart_name')  # Get the chart_name from query parameters
-    
-#     if not chart_name:
-#         return jsonify({"error": "Chart name is required"}), 400
-
-#     conn = get_db_connection()
-#     if conn is None:
-#         return jsonify({"error": "Failed to connect to the database"}), 500
-    
-#     try:
-#         cur = conn.cursor(cursor_factory=RealDictCursor)
-#         cur.execute("SELECT * FROM dashboard_details_WU_ID WHERE chart_type LIKE %s", (f'%{chart_name}%',))
-#         chart_in_dashboard = cur.fetchone()
-#         cur.close()
-#         conn.close()
-
-#         if chart_in_dashboard:
-#             return jsonify({"isInDashboard": True, "message": f"Chart '{chart_name}' is being used in a dashboard."}), 200
-#         else:
-#             return jsonify({"isInDashboard": False, "message": f"Chart '{chart_name}' is not being used in a dashboard."}), 200
-
-#     except Exception as e:
-#         print("Error checking chart usage:", e)
-#         return jsonify({"error": "Failed to check if chart is used"}), 500
-
-# if __name__ == "__main__":
-#     app.run(debug=True)
-
-# @app.route('/api/is-chart-in-dashboard', methods=['GET'])
-# def is_chart_in_dashboard():
-#     chart_name = request.args.get('chart_name')  # Get the chart_name from query parameters
-    
-#     if not chart_name:
-#         return jsonify({"error": "Chart name is required"}), 400
-
-#     conn = get_db_connection()
-#     if conn is None:
-#         return jsonify({"error": "Failed to connect to the database"}), 500
-    
-#     try:
-#         cur = conn.cursor(cursor_factory=RealDictCursor)
-#         # Update the query to reference the new table and look for chart ID or related field
-#         cur.execute("""
-#             SELECT * 
-#             FROM dashboard_details_wu_id 
-#             WHERE chart_ids IN (SELECT CAST(id AS VARCHAR) FROM new_dashboard_details_new WHERE chart_name = %s)
-#         """, (chart_name,))
-
-#         chart_in_dashboard = cur.fetchone()
-#         cur.close()
-#         conn.close()
-
-#         if chart_in_dashboard:
-#             return jsonify({
-#                 "isInDashboard": True, 
-#                 "message": f"Chart '{chart_name}' is being used in a dashboard."
-#             }), 200
-#         else:
-#             return jsonify({
-#                 "isInDashboard": False, 
-#                 "message": f"Chart '{chart_name}' is not being used in a dashboard."
-#             }), 200
-
-#     except Exception as e:
-#         print("Error checking chart usage:", e)
-#         return jsonify({"error": "Failed to check if chart is used"}), 500
 @app.route('/api/is-chart-in-dashboard', methods=['GET'])
 def is_chart_in_dashboard():
     chart_name = request.args.get('chart_name')
@@ -2025,23 +1987,6 @@ def api_get_table_columns(table_name):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# def get_table_columns(table_name):
-#     company=company_name_global
-#     conn = get_company_db_connection(company)
-#      # Replace with your database name
-#     cur = conn.cursor()
-#     cur.execute(
-#         """
-#         SELECT column_name 
-#         FROM information_schema.columns 
-#         WHERE table_name = %s
-#         """,
-#         (table_name,)
-#     )
-#     columns = [row[0] for row in cur.fetchall()]
-#     cur.close()
-#     conn.close()
-#     return columns
 
 
 @app.route('/api/employees', methods=['GET'])
@@ -2174,6 +2119,9 @@ def get_table_data():
         # Log the error for better debugging
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+
 
 
 if __name__ == "__main__":

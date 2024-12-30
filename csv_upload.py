@@ -1,31 +1,32 @@
 
-import os
-import pandas as pd
-import psycopg2
-import re
-from psycopg2 import sql
+# import os
+# import pandas as pd
+# import psycopg2
+# import re
+# from psycopg2 import sql
 
-def sanitize_column_name(col_name):
-    if isinstance(col_name, str):
-        return re.sub(r'\W+', '_', col_name).lower()
-    else:
-        return col_name 
+# def sanitize_column_name(col_name):
+#     if isinstance(col_name, str):
+#         return re.sub(r'\W+', '_', col_name).lower()
+#     else:
+#         return col_name 
 
+# # def clean_data(df):
+# #     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+# #     return df
 # def clean_data(df):
-#     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+#     df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
 #     return df
-def clean_data(df):
-    df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
-    return df
 
 
-def identify_primary_key(df):
-    for col in df.columns:
-        if df[col].is_unique:
-            return col
-    return None
+# def identify_primary_key(df):
+#     for col in df.columns:
+#         if df[col].is_unique:
+#             return col
+#     return None
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'csv')
+# UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'csv')
+
 # def upload_csv_to_postgresql(db_name, username, password, csv_file_name, host='localhost', port='5432'):
 #     current_dir = os.getcwd()
 #     csv_file_path = os.path.join(current_dir, csv_file_name)
@@ -63,25 +64,21 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '
 #     create_table_query = 'CREATE TABLE IF NOT EXISTS "{}" ({}, PRIMARY KEY ({}));'.format(table_name, columns, primary_key_column)
 #     cur.execute(create_table_query)
     
-#      # Check if data already exists in the table
-#     cur.execute('SELECT COUNT(*) FROM "{}"'.format(table_name))
-#     existing_rows_count = cur.fetchone()[0]
+    
+#     for _, row in df.iterrows():
+#         primary_key_value = str(row[primary_key_column])
+#         print(f"Deleting row with {primary_key_column} = {primary_key_value}")
+#         cur.execute('DELETE FROM "{}" WHERE "{}"=%s'.format(table_name, primary_key_column), (primary_key_value,))
 
-#     if existing_rows_count == 0:  # If table is empty, insert all rows
-#         for _, row in df.iterrows():
-#             cur.execute('INSERT INTO "{}" ({}) VALUES ({});'.format(table_name, ', '.join(['"{}"'.format(col) for col in df.columns]), ', '.join(["%s" for _ in row])), tuple(row))
-#         print("Successfully inserted data into table '{}'. ".format(table_name))
-#     else:
-#         # Compare each row in the CSV with existing rows in the database
-#         for _, row in df.iterrows():
-#             # Check if row exists based on primary key
-#             cur.execute('SELECT COUNT(*) FROM "{}" WHERE "{}"=%s'.format(table_name, primary_key_column), (str(row[primary_key_column]),))
-#             if cur.fetchone()[0] == 0:  # If row does not exist, insert it
-#                 cur.execute('INSERT INTO "{}" ({}) VALUES ({});'.format(table_name, ', '.join(['"{}"'.format(col) for col in df.columns]), ', '.join(["%s" for _ in row])), tuple(row))
-#             else:  # If row exists, update it
-#                 update_set = ', '.join(['"{}"=%s'.format(col) for col in df.columns])
-#                 cur.execute('UPDATE "{}" SET {} WHERE "{}"=%s'.format(table_name, update_set, primary_key_column), tuple(row) + (str(row[primary_key_column]),))
-#         print("Successfully updated data in table '{}'. ".format(table_name))
+#     # Print how many rows were deleted
+#     print(f"Deleted {len(df)} rows with matching primary key values in table '{table_name}'.")
+
+#     # Insert new rows
+#     for _, row in df.iterrows():
+#         cur.execute('INSERT INTO "{}" ({}) VALUES ({});'.format(table_name, ', '.join(['"{}"'.format(col) for col in df.columns]), ', '.join(["%s" for _ in row])), tuple(row))
+
+#     print("Successfully inserted new data into table '{}'.".format(table_name))
+
 
 #     # Check if the 'datasource' table exists and create it if it does not
 #     cur.execute("""
@@ -118,6 +115,85 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '
 #     df.to_csv(file_path, index=False)
 
 #     conn.close()
+
+import os
+import pandas as pd
+import psycopg2
+import re
+from psycopg2 import sql
+
+
+# Sanitize column names by replacing non-alphanumeric characters with underscores and converting to lowercase
+def sanitize_column_name(col_name):
+    if isinstance(col_name, str):
+        return re.sub(r'\W+', '_', col_name).lower()
+    else:
+        return col_name 
+
+
+# Clean DataFrame by stripping whitespace from string columns
+def clean_data(df):
+    df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+    return df
+
+
+# Identify a unique column to use as a primary key
+def identify_primary_key(df):
+    for col in df.columns:
+        if df[col].is_unique:
+            return col
+    return None
+
+
+# Function to validate if the table exists
+def validate_table_structure(cur, table_name):
+    cur.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s)", (table_name,))
+    table_exists = cur.fetchone()[0]
+    return table_exists
+
+
+# # Function to map pandas dtypes to PostgreSQL types
+# def determine_sql_data_type(value):
+#     if pd.api.types.is_string_dtype(value):
+#         return 'VARCHAR'
+#     elif pd.api.types.is_integer_dtype(value):
+#         return 'INTEGER'
+#     elif pd.api.types.is_float_dtype(value):
+#         return 'DOUBLE PRECISION'
+#     elif pd.api.types.is_bool_dtype(value):
+#         return 'BOOLEAN'
+#     elif pd.api.types.is_datetime64_any_dtype(value):
+#         return 'DATE'
+#     else:
+#         return 'VARCHAR'
+
+def determine_sql_data_type(value):
+    # Check for string values resembling dates
+    date_pattern = r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$"
+    if pd.api.types.is_string_dtype(value):
+        if value.str.match(date_pattern).any():
+            return 'DATE'
+        return 'VARCHAR'
+    elif pd.api.types.is_integer_dtype(value):
+        return 'INTEGER'
+    elif pd.api.types.is_float_dtype(value):
+        return 'DOUBLE PRECISION'
+    elif pd.api.types.is_bool_dtype(value):
+        return 'BOOLEAN'
+    elif pd.api.types.is_datetime64_any_dtype(value):
+        return 'DATE'
+    else:
+        return 'VARCHAR'
+
+# Function to check for duplicate columns
+def check_repeating_columns(df):
+    duplicate_columns = df.columns[df.columns.duplicated()].tolist()
+    return duplicate_columns
+
+
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'csv')
+
+
 def upload_csv_to_postgresql(db_name, username, password, csv_file_name, host='localhost', port='5432'):
     current_dir = os.getcwd()
     csv_file_path = os.path.join(current_dir, csv_file_name)
@@ -128,6 +204,11 @@ def upload_csv_to_postgresql(db_name, username, password, csv_file_name, host='l
         return
 
     df = pd.read_csv(csv_file_path)
+    duplicate_columns = check_repeating_columns(df)
+    if duplicate_columns:
+        print(f"Error: Duplicate columns found in the CSV: {duplicate_columns}")
+        return
+
     directory_name = os.path.splitext(os.path.basename(csv_file_name))[0]
     directory_path = os.path.join(UPLOAD_FOLDER, directory_name)
     os.makedirs(directory_path, exist_ok=True)
@@ -150,38 +231,32 @@ def upload_csv_to_postgresql(db_name, username, password, csv_file_name, host='l
 
     primary_key_column = sanitize_column_name(primary_key_column)
 
-    # Define table columns with data types
-    columns = ', '.join('"{}" VARCHAR'.format(col) for col in df.columns)
-    create_table_query = 'CREATE TABLE IF NOT EXISTS "{}" ({}, PRIMARY KEY ({}));'.format(table_name, columns, primary_key_column)
-    cur.execute(create_table_query)
-    
-    # Delete rows where primary key matches uploaded data
-    # for _, row in df.iterrows():
-    #     cur.execute('DELETE FROM "{}" WHERE "{}"=%s'.format(table_name, primary_key_column), (str(row[primary_key_column]),))
-    
-    # print("Deleted matching rows from table '{}'.".format(table_name))
-    # print(f"Deleted {len(primary_key_column)} rows with matching primary key values in table '{table_name}'.")
+    # Validate table structure
+    table_exists = validate_table_structure(cur, table_name)
+    if not table_exists:
+        # Define table columns with data types
+        columns = ', '.join('"{}" {}'.format(col, determine_sql_data_type(df[col])) for col in df.columns)
+        create_table_query = 'CREATE TABLE IF NOT EXISTS "{}" ({}, PRIMARY KEY ({}));'.format(table_name, columns, primary_key_column)
+        cur.execute(create_table_query)
+    else:
+        print(f"Table '{table_name}' already exists.")
 
-    # # Insert new rows
-    # for _, row in df.iterrows():
-    #     cur.execute('INSERT INTO "{}" ({}) VALUES ({});'.format(table_name, ', '.join(['"{}"'.format(col) for col in df.columns]), ', '.join(["%s" for _ in row])), tuple(row))
-
-    # print("Successfully inserted new data into table '{}'.".format(table_name))
-    # Delete rows where primary key matches uploaded data
+    # Delete existing rows matching primary key
     for _, row in df.iterrows():
         primary_key_value = str(row[primary_key_column])
-        print(f"Deleting row with {primary_key_column} = {primary_key_value}")
         cur.execute('DELETE FROM "{}" WHERE "{}"=%s'.format(table_name, primary_key_column), (primary_key_value,))
 
-    # Print how many rows were deleted
     print(f"Deleted {len(df)} rows with matching primary key values in table '{table_name}'.")
 
     # Insert new rows
     for _, row in df.iterrows():
-        cur.execute('INSERT INTO "{}" ({}) VALUES ({});'.format(table_name, ', '.join(['"{}"'.format(col) for col in df.columns]), ', '.join(["%s" for _ in row])), tuple(row))
+        cur.execute('INSERT INTO "{}" ({}) VALUES ({});'.format(
+            table_name,
+            ', '.join(['"{}"'.format(col) for col in df.columns]),
+            ', '.join(["%s" for _ in row])
+        ), tuple(row))
 
-    print("Successfully inserted new data into table '{}'.".format(table_name))
-
+    print(f"Successfully inserted new data into table '{table_name}'.")
 
     # Check if the 'datasource' table exists and create it if it does not
     cur.execute("""
@@ -218,3 +293,4 @@ def upload_csv_to_postgresql(db_name, username, password, csv_file_name, host='l
     df.to_csv(file_path, index=False)
 
     conn.close()
+    print("File successfully uploaded and saved.")
