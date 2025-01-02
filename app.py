@@ -1674,12 +1674,25 @@ def get_roles():
     print(role_list)
     return jsonify(role_list)
 
+# @app.route('/fetchglobeldataframe', methods=['GET'])
+# def get_hello_data():
+#     dataframe=bc.global_df
+#     print("dataframe........................",dataframe)
+#     dataframe_dict = dataframe.to_dict(orient='records')
+#     return jsonify({"data frame":dataframe_dict})
+
 @app.route('/fetchglobeldataframe', methods=['GET'])
 def get_hello_data():
-    dataframe=bc.global_df
-    print("dataframe........................",dataframe)
+    dataframe = bc.global_df
+    print("dataframe........................", dataframe)
+    
+    # Convert datetime columns to string to avoid NaT issues
+    for col in dataframe.select_dtypes(include=['datetime64[ns]']).columns:
+        dataframe[col] = dataframe[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('null')
+    
     dataframe_dict = dataframe.to_dict(orient='records')
-    return jsonify({"data frame":dataframe_dict})
+    return jsonify({"data frame": dataframe_dict})
+
 
 @app.route('/aichartdata', methods=['GET'])
 def ai_barchart():
