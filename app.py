@@ -494,6 +494,7 @@ def get_filter_options(selectedTable, columnName):
     xAxis = request.args.getlist('xAxis[]')  # Use getlist() to retrieve all values
     print("xAxis====================",xAxis)
     print("db_nameeee====================",db_nameeee)
+    print("column_name====================",column_name)    
     column_data=fetch_column_name(table_name, column_name, db_nameeee)
     print("column_data====================",column_data)
     return jsonify(column_data)
@@ -1998,6 +1999,7 @@ def handle_hierarchical_bar_click():
                 depth=current_depth, 
                 aggregation=data.get('aggregation')
             )
+            print("Drill-down result:", drill_down_result)
             return jsonify(drill_down_result)
 
         except Exception as e:
