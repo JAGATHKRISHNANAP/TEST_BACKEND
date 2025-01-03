@@ -177,7 +177,9 @@ def get_table_names():
 @app.route('/column_names/<table_name>',methods=['GET'] )
 def get_columns(table_name):
     db_nameeee= request.args.get('databaseName')
-    column_names = get_column_names(db_nameeee, username, password, table_name, host, port)
+    connectionType= request.args.get('connectionType')
+    print("connectionType",connectionType)
+    column_names = get_column_names(db_nameeee, username, password, table_name, host, port,connectionType)
     print("column_names====================",column_names)
     return jsonify(column_names)
 
@@ -233,10 +235,52 @@ def get_bar_chart_route():
     aggregation = data['aggregate']
     checked_option = data['filterOptions']
     db_nameeee = data['databaseName']
+    chart_data=data['chartType']
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
-    if len(x_axis_columns) == 2:  # Handle dual X-axis scenario
+    if len(y_axis_columns) == 0 and chart_data == "wordCloud": 
+        # Handle WordCloud scenario
+        x_axis_columns_str = ', '.join(x_axis_columns)
+        query = f"""
+            SELECT word, COUNT(*) AS word_count
+            FROM (
+                SELECT regexp_split_to_table({x_axis_columns_str}, '\\s+') AS word
+                FROM {table_name}
+            ) AS words
+            GROUP BY word
+            ORDER BY word_count DESC;
+        """
+        print("WordCloud SQL Query:", query)
+        
+        try:
+            # Execute the query
+            connection = get_db_connection(db_nameeee)
+            cursor = connection.cursor()
+            cursor.execute(query)
+            data = cursor.fetchall()
+            
+            categories = [row[0] for row in data]  # Words
+            values = [row[1] for row in data]     # Counts
+            
+            # return jsonify({
+            #     "categories": categories,
+            #     "values": values,
+            #     "chartType": "wordCloud",
+            #     "dataframe": df_json
+            # })
+            data = {
+            "categories" : [row[0] for row in data],  # Words
+            "values" : [row[1] for row in data],     #
+            "dataframe": df_json
+            }
+        
+            return jsonify(data)
+        except Exception as e:
+            print("Error executing WordCloud query:", e)
+            return jsonify({"error": str(e)})
+    
+    if len(x_axis_columns) == 2 and chart_data == "duealbarChart":    # Handle dual X-axis scenario
             data = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
             
             # Return categories and series for dual X-axis chart
@@ -450,32 +494,59 @@ def handle_bar_click():
 #     return jsonify(column_data)
 
 from functools import lru_cache
+# @app.route('/plot_chart/<selectedTable>/<columnName>', methods=['POST', 'GET'])
+# def get_filter_options(selectedTable, columnName):
+#     table_name = selectedTable
+#     column_name = columnName
+#     db_name = request.args.get('databaseName')
+
+#     print("table_name====================", table_name)
+#     print("db_name====================", db_name)
+#     print("column_name====================", column_name)
+
+#     # Fetch data from cache or database
+#     column_data = fetch_column_name_with_cache(table_name, column_name, db_name)
+    
+#     print("column_data====================", column_data)
+#     return jsonify(column_data)
+
+
+# @lru_cache(maxsize=128)
+# def fetch_column_name_with_cache(table_name, column_name, db_name):
+#     print("Fetching from database...")
+#     return fetch_column_name(table_name, column_name, db_name)
+# @app.route('/clear_cache', methods=['POST'])
+# def clear_cache():
+#     fetch_column_name_with_cache.cache_clear()
+#     return jsonify({"message": "Cache cleared!"})
 @app.route('/plot_chart/<selectedTable>/<columnName>', methods=['POST', 'GET'])
 def get_filter_options(selectedTable, columnName):
     table_name = selectedTable
     column_name = columnName
     db_name = request.args.get('databaseName')
+    connection_type = request.args.get('connectionType', 'local')  # Default to 'local' if not specified
 
     print("table_name====================", table_name)
     print("db_name====================", db_name)
     print("column_name====================", column_name)
+    print("connection_type====================", connection_type)
 
     # Fetch data from cache or database
-    column_data = fetch_column_name_with_cache(table_name, column_name, db_name)
+    column_data = fetch_column_name_with_cache(table_name, column_name, db_name, connection_type)
     
     print("column_data====================", column_data)
     return jsonify(column_data)
 
 
 @lru_cache(maxsize=128)
-def fetch_column_name_with_cache(table_name, column_name, db_name):
+def fetch_column_name_with_cache(table_name, column_name, db_name, connection_type):
     print("Fetching from database...")
-    return fetch_column_name(table_name, column_name, db_name)
+    return fetch_column_name(table_name, column_name, db_name, connection_type)
+
 @app.route('/clear_cache', methods=['POST'])
 def clear_cache():
     fetch_column_name_with_cache.cache_clear()
     return jsonify({"message": "Cache cleared!"})
-
 
 
 def create_table():
@@ -486,7 +557,7 @@ def create_table():
         cur.execute("""
             CREATE TABLE IF NOT EXISTS new_dashboard_details_new (
                 id SERIAL PRIMARY KEY,
-                User_id VARCHAR,
+                User_id integer,
                 company_name VARCHAR,
                 chart_name VARCHAR,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -515,9 +586,12 @@ def save_data():
     user_id=data['user_id']
     save_name= data['saveName']
     company_name=data['company_name']   
+    
+    
     print("company_name====================",company_name)  
     print("user_id====================",user_id)
     print("save_name====================", save_name)
+    print("connectionType====================", data)
     create_table()
     
     try:
@@ -1015,7 +1089,7 @@ def receive_single_value_chart_data():
     chart_id=data.get('chart_id')
     x_axis = data.get('text_y_xis')[0]
     databaseName = data.get('text_y_database')
-    table_Name = data.get('text_y_table')[0]
+    table_Name = data.get('text_y_table')
     print("table_Name====================",table_Name)
     aggregate=data.get('text_y_aggregate')
     print("x_axis====================",x_axis)  
@@ -1132,7 +1206,8 @@ def receive_chart_details():
     chart_heading = data.get('chart_heading')
     filter_options = data.get('filter_options').split(', ')  # Convert filter_options string to a list
     databaseName = data.get('databaseName')
-
+    connectionType=data.get('connectionType')
+    company_name=data.get('databaseName')
     print("chart_id====================", chart_id)
     print("tableName====================", tableName)
     print("x_axis====================", x_axis)
@@ -1142,7 +1217,7 @@ def receive_chart_details():
     print("chart_heading====================", chart_heading)
     print("filter_options====================", filter_options)
     print("databaseName====================", databaseName)
-
+    print("connectionType",connectionType)
     # Define aggregate function based on request
     aggregate_py = {
         'count': 'count',
@@ -1154,10 +1229,61 @@ def receive_chart_details():
 
     try:
         # Get the database connection
-        connection = get_db_connection_view(databaseName)
+        # connection = get_db_connection_view(databaseName)
+        # df = fetch_chart_data(connection, tableName)
+        if connectionType == 'external':
+            connection = fetch_external_db_connection(company_name)  # Custom logic for 'external' connection type
+            host = connection[2]
+            dbname = connection[6]
+            user = connection[3]
+            password = connection[4]
+            
+            # Create a new psycopg2 connection using the details from the tuple
+            connection = psycopg2.connect(
+                dbname=dbname,
+                user=user,
+                password=password,
+                host=host
+            )
+            print('External Connection established:', connection)
+        else:
+            connection = get_db_connection_view(databaseName)
         df = fetch_chart_data(connection, tableName)
         print(df.head())
-
+        if chart_type == 'wordCloud':
+            # Handle WordCloud scenario
+            if len(y_axis) == 0:
+                x_axis_columns_str = ', '.join(x_axis)
+                query = f"""
+                    SELECT word, COUNT(*) AS word_count
+                    FROM (
+                        SELECT regexp_split_to_table({x_axis_columns_str}, '\\s+') AS word
+                        FROM {tableName}
+                    ) AS words
+                    GROUP BY word
+                    ORDER BY word_count DESC;
+                """
+                print("WordCloud SQL Query:", query)
+                
+                try:
+                    # Execute the query
+                    cursor = connection.cursor()
+                    cursor.execute(query)
+                    data = cursor.fetchall()
+                    
+                    categories = [row[0] for row in data]  # Words
+                    values = [row[1] for row in data]     # Counts
+                    
+                    # Return the word cloud data
+                    return jsonify({
+                        "categories": categories,
+                        "values": values,
+                        "chart_type": chart_type,
+                        "chart_heading": chart_heading,
+                    }), 200
+                except Exception as e:
+                    print("Error executing WordCloud query:", e)
+                    return jsonify({"error": str(e)}), 500
         # Logic for 'singleValueChart'
         if chart_type == 'singleValueChart':
             try:
@@ -2120,9 +2246,518 @@ def get_table_data():
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
 
+# Function to create a database connection
+def create_connection( db_name="datasource",
+        user="postgres",
+        password="Gayu@123",
+        host="localhost",
+        port="5432"):
+    try:
+        conn = psycopg2.connect(
+            dbname=db_name,
+            user=user,
+            password=password,
+            host=host,
+            port=port
+        )
+        return conn
+    except psycopg2.Error as e:
+        return str(e)
+
+# @app.route('/connect', methods=['POST'])
+# def connect_and_create_table():
+#     data = request.json
+#     username = data.get('username')
+#     password = data.get('password')
+#     host = data.get('host', 'localhost')
+#     port = data.get('port', '5432')
+#     db_name = data.get('dbName')
+
+#     try:
+#         # Connect to the default PostgreSQL database to create a new database
+#         default_conn = psycopg2.connect(
+#             user=username, password=password, host=host, port=port
+#         )
+#         default_conn.autocommit = True
+#         default_cursor = default_conn.cursor()
+
+#         # Create the target database if it doesn't exist
+#         default_cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
+#         default_conn.close()
+
+#         # Get a connection to the newly created company-specific database
+#         conn = get_company_db_connection(db_name)
+#         cursor = conn.cursor()
+
+#         # Create the table in the company-specific database
+#         cursor.execute("""
+#             CREATE TABLE IF NOT EXISTS company_data (
+#                 id SERIAL PRIMARY KEY,
+#                 company_name VARCHAR(255) NOT NULL,
+#                 client_name VARCHAR(255) NOT NULL,
+#                 database_type VARCHAR(50) NOT NULL
+#             );
+#         """)
+
+#         conn.commit()
+
+#         # Fetch table names from the company-specific database to verify
+#         cursor.execute("""
+#             SELECT table_name FROM information_schema.tables
+#             WHERE table_schema = 'public';
+#         """)
+#         tables = [row[0] for row in cursor.fetchall()]
+
+#         conn.close()
+
+#         return jsonify(success=True, tables=tables)
+#     except Exception as e:
+#         return jsonify(success=False, error=str(e))
+
+
+@app.route('/save_connection', methods=['POST'])
+def save_connection():
+    data = request.json
+    dbType = data.get('dbType')
+    provider = data.get('provider')
+    dbUsername = data.get('dbUsername')
+    dbPassword = data.get('dbPassword')
+    saveName=data.get('saveName')
+    port = data.get('port')
+    dbName = data.get('dbName')
+    company_name=data.get('company_name')
+    print(data)
+    try:
+            # Save the connection details to your local database
+            save_connection_details(company_name,dbType, provider, dbUsername, dbPassword, port, dbName,saveName)
+            print("save_connection_details",save_connection_details)
+            return jsonify(success=True, message="Connection details saved successfully.")
+    except Exception as e:
+            return jsonify(success=False, error=f"Failed to save connection details: {str(e)}")
+def save_connection_details(company_name,dbType, provider, dbUsername, dbPassword, port, dbName,saveName):
+    try:
+        # Connect to your local database where you want to store the connection details
+        conn = psycopg2.connect(
+             dbname=company_name,  # Ensure this is the correct company database
+        user=USER_NAME,password=PASSWORD,host=HOST,port=PORT
+            
+        )
+        cursor = conn.cursor()
+     # Create the table if it doesn't exist
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS external_db_connections (
+            id SERIAL PRIMARY KEY,
+            saveName VARCHAR(100),
+            db_type VARCHAR(100),
+            provider VARCHAR(100),
+            db_username VARCHAR(100),
+            db_password VARCHAR(100),
+            port VARCHAR(10),
+            db_name VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+        cursor.execute(create_table_query)
+        # Insert the connection details into the table
+        insert_query = sql.SQL("""
+            INSERT INTO external_db_connections (saveName,db_type, provider, db_username, db_password, port, db_name)
+            VALUES (%s, %s, %s, %s, %s, %s,%s)
+        """)
+        cursor.execute(insert_query, (saveName,dbType, provider, dbUsername, dbPassword, port, dbName))
+
+        # Commit the changes
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        raise Exception(f"Failed to save connection details: {str(e)}")
+
+def get_Edb_connection(username, password, host, port, db_name):
+    try:
+        conn = psycopg2.connect(
+            dbname=db_name, user=username, password=password, host=host, port=port
+        )
+        return conn
+    except Exception as e:
+        raise Exception(f"Unable to connect to the database: {str(e)}")
+
+# @app.route('/connect', methods=['POST'])
+# def connect_and_fetch_tables():
+#     data = request.json
+#     username = data.get('username')
+#     password = data.get('password')
+#     host = data.get('host', 'localhost')  # Default to localhost if not provided
+#     port = data.get('port', '5432')  # Default PostgreSQL port
+#     db_name = data.get('dbName')
+
+#     try:
+#         # Connect to the external database using the provided credentials
+#         conn = get_Edb_connection(username, password, host, port, db_name)
+#         cursor = conn.cursor()
+
+#         # Query to fetch all tables in the 'public' schema
+#         cursor.execute("""
+#             SELECT table_name 
+#             FROM information_schema.tables 
+#             WHERE table_schema = 'public';
+#         """)
+
+#         # Get the list of tables
+#         tables = [row[0] for row in cursor.fetchall()]
+
+#         conn.close()
+
+#         return jsonify(success=True, tables=tables)
+#     except Exception as e:
+#         return jsonify(success=False, error=str(e))
+from pymongo import MongoClient
+import mysql.connector
+import cx_Oracle
+
+@app.route('/connect', methods=['POST'])
+def connect_and_fetch_tables():
+    data = request.json
+    dbType = data.get('dbType')
+    username = data.get('username')
+    password = data.get('password')
+    host = data.get('host', 'localhost')  # Default to localhost if not provided
+    port = data.get('port')  # Port should be provided based on the database type
+    db_name = data.get('dbName')
+
+    try:
+        if dbType == "PostgreSQL":
+            # Connect to PostgreSQL
+            conn = psycopg2.connect(
+                dbname=db_name, user=username, password=password, host=host, port=port
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+            tables = [row[0] for row in cursor.fetchall()]
+            conn.close()
+        elif dbType == "MongoDB":
+            # Connect to MongoDB
+            mongo_uri = f"mongodb://{username}:{password}@{host}:{port}/{db_name}"
+            client = MongoClient(mongo_uri)
+            db = client[db_name]
+            tables = db.list_collection_names()
+        elif dbType == "MySQL":
+            # Connect to MySQL
+            conn = mysql.connector.connect(
+                host=host, user=username, password=password, database=db_name, port=port
+            )
+            cursor = conn.cursor()
+            cursor.execute("SHOW TABLES;")
+            tables = [row[0] for row in cursor.fetchall()]
+            conn.close()
+        elif dbType == "Oracle":
+            # Connect to Oracle
+            dsn = cx_Oracle.makedsn(host, port, service_name=db_name)
+            conn = cx_Oracle.connect(user=username, password=password, dsn=dsn)
+            cursor = conn.cursor()
+            cursor.execute("SELECT table_name FROM all_tables")
+            tables = [row[0] for row in cursor.fetchall()]
+            conn.close()
+        else:
+            return jsonify(success=False, error="Unsupported database type.")
+        
+        return jsonify(success=True, tables=tables)
+    except Exception as e:
+        return jsonify(success=False, error=f"Failed to connect: {str(e)}")
+
+
+def fetch_external_db_connection(company_name):
+    try:
+        print("company_name",company_name)
+        # Connect to local PostgreSQL to get external database connection details
+        conn = psycopg2.connect(
+           dbname=company_name,  # Ensure this is the correct company database
+        user=USER_NAME,password=PASSWORD,host=HOST,port=PORT
+        )
+        print("conn",conn)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM external_db_connections ORDER BY created_at DESC LIMIT 1;")
+        connection_details = cursor.fetchone()
+        conn.close()
+        return connection_details
+    except Exception as e:
+        print(f"Error fetching connection details: {e}")
+        return None
+
+# # Function to fetch table names from the external database
+# def fetch_table_names_from_external_db(db_details):
+#     try:
+#         # Connect to the external database using the connection details
+#         conn = psycopg2.connect(
+#             host=db_details['host'],
+#             database=db_details['database'],
+#             user=db_details['user'],
+#             password=db_details['password']
+#         )
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+#         table_names = cursor.fetchall()
+#         conn.close()
+#         return [table[0] for table in table_names]  # return list of table names
+#     except Exception as e:
+#         print(f"Error fetching table names: {e}")
+#         return []
+def fetch_table_names_from_external_db(db_details):
+    try:
+        db_type = db_details.get('dbType')
+        if db_type == "PostgreSQL":
+            # Connect to PostgreSQL
+            conn = psycopg2.connect(
+                host=db_details['host'],
+                database=db_details['database'],
+                user=db_details['user'],
+                password=db_details['password']
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+            table_names = [table[0] for table in cursor.fetchall()]
+            conn.close()
+        elif db_type == "MongoDB":
+            # Connect to MongoDB
+            mongo_uri = f"mongodb://{db_details['user']}:{db_details['password']}@{db_details['host']}:{db_details['port']}/{db_details['database']}"
+            client = MongoClient(mongo_uri)
+            db = client[db_details['database']]
+            table_names = db.list_collection_names()
+        elif db_type == "MySQL":
+            # Connect to MySQL
+            conn = mysql.connector.connect(
+                host=db_details['host'],
+                user=db_details['user'],
+                password=db_details['password'],
+                database=db_details['database'],
+                port=db_details.get('port', 3306)
+            )
+            cursor = conn.cursor()
+            cursor.execute("SHOW TABLES;")
+            table_names = [table[0] for table in cursor.fetchall()]
+            conn.close()
+        elif db_type == "Oracle":
+            # Connect to Oracle
+            dsn = cx_Oracle.makedsn(
+                db_details['host'], db_details.get('port', 1521), service_name=db_details['database']
+            )
+            conn = cx_Oracle.connect(
+                user=db_details['user'], password=db_details['password'], dsn=dsn
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT table_name FROM all_tables")
+            table_names = [table[0] for table in cursor.fetchall()]
+            conn.close()
+        else:
+            raise ValueError("Unsupported database type provided.")
+        
+        return table_names  # Return list of table names
+
+    except Exception as e:
+        print(f"Error fetching table names: {e}")
+        return []
+
+
+@app.route('/external-db/tables', methods=['GET'])
+def get_external_db_table_names():
+    
+    company_name = request.args.get('databaseName')
+    print("companydb", company_name)
+    external_db_connection = fetch_external_db_connection(company_name)
+    if external_db_connection:
+        db_details = {
+            "host": external_db_connection[2],
+            "database": external_db_connection[6],
+            "user": external_db_connection[3],
+            "password": external_db_connection[4],
+            "dbType": external_db_connection[1]
+        }
+        table_names = fetch_table_names_from_external_db(db_details)
+        return jsonify(table_names)
+    else:
+        return jsonify({"error": "Could not retrieve external database connection details"}), 500
+@app.route('/external-db/tables/<table_name>', methods=['GET'])
+def get_externaltable_data(table_name):
+    company_name = request.args.get('databaseName')
+    print("companydb", company_name)
+    external_db_connection = fetch_external_db_connection(company_name)
+    if external_db_connection:
+        db_details = {
+            "host": external_db_connection[2],
+            "database": external_db_connection[6],
+            "user": external_db_connection[3],
+            "password": external_db_connection[4],
+            "dbType": external_db_connection[1]
+        }
+        try:
+            # Fetch data from the specified table
+            table_data = fetch_data_from_table(db_details, table_name)
+            return jsonify(table_data)
+        except Exception as e:
+            return jsonify({"error": f"Error fetching data from table '{table_name}': {str(e)}"}), 500
+    else:
+        return jsonify({"error": "Could not retrieve external database connection details"}), 500
+# def fetch_data_from_table(db_details, table_name):
+#     try:
+#         conn = psycopg2.connect(
+#             host=db_details["host"],
+#             database=db_details["database"],
+#             user=db_details["user"],
+#             password=db_details["password"]
+#         )
+#         cursor = conn.cursor()
+#         query = f"SELECT * FROM {table_name} LIMIT 10;"  # Adjust the query as needed
+#         cursor.execute(query)
+#         rows = cursor.fetchall()
+#         columns = [desc[0] for desc in cursor.description]
+#         return [dict(zip(columns, row)) for row in rows]
+#     except Exception as e:
+#         raise Exception(f"Error querying table '{table_name}': {str(e)}")
+#     finally:
+#         if conn:
+#             conn.close()
+
+def fetch_data_from_table(db_details, table_name):
+    try:
+        dbType = db_details.get('dbType')
+        if dbType == "PostgreSQL":
+            conn = psycopg2.connect(
+                host=db_details["host"],
+                database=db_details["database"],
+                user=db_details["user"],
+                password=db_details["password"]
+            )
+        elif dbType == "MongoDB":
+            mongo_uri = f"mongodb://{db_details['user']}:{db_details['password']}@{db_details['host']}:{db_details['port']}/{db_details['database']}"
+            client = MongoClient(mongo_uri)
+            db = client[db_details['database']]
+            collection = db[table_name]
+            data = list(collection.find().limit(10))  # Fetch data from MongoDB
+            return data
+        elif dbType == "MySQL":
+            conn = mysql.connector.connect(
+                host=db_details["host"],
+                user=db_details["user"],
+                password=db_details["password"],
+                database=db_details["database"],
+                port=db_details["port"]
+            )
+        elif dbType == "Oracle":
+            dsn = cx_Oracle.makedsn(
+                db_details["host"], db_details["port"], service_name=db_details["database"]
+            )
+            conn = cx_Oracle.connect(
+                user=db_details["user"], password=db_details["password"], dsn=dsn
+            )
+        else:
+            raise Exception("Unsupported database type.")
+
+        cursor = conn.cursor()
+        query = f"SELECT * FROM {table_name} FETCH FIRST 10 ROWS ONLY" if dbType == "Oracle" else f"SELECT * FROM {table_name} LIMIT 10;"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        raise Exception(f"Error querying table '{table_name}': {str(e)}")
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 
 
+
+
+import ast
+@app.route('/wordcloud-data', methods=['POST'])
+def wordcloud_data():
+    try:
+        data = request.json
+        checkedOption = data.get("checkedOption", [])
+        db_name = data.get("databaseName", "")
+        if not db_name:
+            return jsonify({"error": "Database name is missing"}), 400
+        conn = psycopg2.connect(f"dbname={db_name} user=postgres password=Gayu@123 host=localhost")
+        cur = conn.cursor()
+
+        category = data.get("category", [])
+        table_name = data.get("tableName", "")
+        if not category or not table_name:
+            return jsonify({"error": "Missing required parameters"}), 400
+        category_columns = ', '.join(category)
+        print(f"Category columns: {category_columns}")
+        print(f"table_name: {table_name}")
+        print(f"checkedOption: {checkedOption}")
+
+        if checkedOption:
+            # Flatten the list of lists and ensure they are strings
+            
+            # flattened_checkedOption = = list(itertools.chain(*checkedOption))
+            # print("flattened_checkedOption",flattened_checkedOption)
+            # Flatten the list
+            flattened_checkedOption = [name[0] for name in checkedOption]
+
+            # Print the flattened list to check the result
+            print("flattened_checkedOption:", flattened_checkedOption)
+
+            # If you're dealing with string representations, use ast.literal_eval() to safely evaluate them
+            # (In case your data is coming as string representation of list)
+            flattened_checkedOption = [ast.literal_eval(name) if isinstance(name, str) else name for name in flattened_checkedOption]
+
+            print("After eval (if necessary):", flattened_checkedOption)
+            # Create placeholders dynamically for the IN clause (using %s for each item)
+            placeholders = ', '.join('%s' * len(flattened_checkedOption))
+
+
+            # Create placeholders dynamically for the IN clause
+            placeholders = flattened_checkedOption
+
+            # Query when a checked option is provided
+            query = f"""
+                SELECT word, COUNT(*) AS word_count
+                FROM (
+                    SELECT regexp_split_to_table({category_columns}, '\s+') AS word
+                    FROM {table_name}
+                    WHERE {category_columns} IN ({placeholders})
+                ) AS words
+                GROUP BY word
+                ORDER BY word_count DESC;
+            """
+            print(f"Executing query: {query}")
+            print(f"Parameters: {tuple(flattened_checkedOption)}")
+
+            # Execute the query with the flattened list as parameters
+            cur.execute(query, tuple(flattened_checkedOption))
+        else:
+            # Query when no checked option is provided
+            query = f"""
+                SELECT word, COUNT(*) AS word_count
+                FROM (
+                    SELECT regexp_split_to_table({category_columns}, '\s+') AS word
+                    FROM {table_name}
+                ) AS words
+                GROUP BY word
+                ORDER BY word_count DESC;
+            """
+            print(f"Executing query: {query}")
+            cur.execute(query)
+
+        results = cur.fetchall()
+        if not results:
+            print("No results returned from the query.")
+            return jsonify({"error": "No data available."}), 404
+
+        response_data = {
+            "categories": [row[0] for row in results],
+            "values": [row[1] for row in results],
+        }
+
+        cur.close()
+        conn.close()
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

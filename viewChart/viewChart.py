@@ -28,8 +28,9 @@ def get_db_connection_view(database_name):
 
 def fetch_chart_data(connection, tableName):
     try:
+        print('connection',connection)
         cursor = connection.cursor()
-
+        print('curs',cursor)
         # Use SQL composition to safely query using dynamic table and column names
         query = sql.SQL("SELECT * FROM {table}")
         query = query.format(
