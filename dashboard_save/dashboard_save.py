@@ -167,6 +167,69 @@ from viewChart.viewChart import get_db_connection_view,fetch_chart_data
 from bar_chart import fetchText_data
 
 
+# def get_dashboard_view_chart_data(chart_ids):
+#     conn = create_connection()  # Initial connection to your main database
+#     if conn:
+#         try:
+#             if isinstance(chart_ids, str):
+#                 import ast
+#                 chart_ids = ast.literal_eval(chart_ids)  # Convert string representation of list to actual list
+
+#             chart_data_list = []
+
+#             for chart_id in chart_ids:
+#                 cursor = conn.cursor()
+#                 cursor.execute("SELECT id, database_name, selected_table, x_axis, y_axis, aggregate, chart_type, filter_options, chart_heading,chart_color FROM new_dashboard_details_new WHERE id = %s", (chart_id,))
+#                 chart_data = cursor.fetchone()
+#                 cursor.close()
+
+#                 if chart_data:
+#                     # Extract chart data
+#                     database_name = chart_data[1]  # Assuming `database_name` is the second field
+#                     table_name = chart_data[2]
+#                     x_axis = chart_data[3]
+#                     y_axis = chart_data[4]  # Assuming y_axis is a list
+#                     aggregate = chart_data[5]
+#                     chart_type = chart_data[6]
+#                     chart_heading = chart_data[8]
+#                     filter_options = chart_data[7]
+#                     chart_color = chart_data[9]  # Assuming chart_color is a list
+
+#                     # Determine the aggregation function
+#                     aggregate_py = {
+#                         'count': 'count',
+#                         'sum': 'sum',
+#                         'average': 'mean',
+#                         'minimum': 'min',
+#                         'maximum': 'max'
+#                     }.get(aggregate, 'sum')  # Default to 'sum' if no match
+
+def fetch_external_db_connection(database_name,selected_user):
+    try:
+        print("company_name",database_name)
+        # Connect to local PostgreSQL to get external database connection details
+        conn = psycopg2.connect(
+           dbname=database_name,  # Ensure this is the correct company database
+        user=USER_NAME,password=PASSWORD,host=HOST,port=PORT
+        )
+        print("conn",conn)
+        cursor = conn.cursor()
+        query = """
+            SELECT * 
+            FROM external_db_connections 
+            WHERE savename = %s 
+            ORDER BY created_at DESC 
+            LIMIT 1;
+        """
+        print("query",query)
+        cursor.execute(query, (selected_user,))
+        connection_details = cursor.fetchone()
+        conn.close()
+        return connection_details
+    except Exception as e:
+        print(f"Error fetching connection details: {e}")
+        return None
+
 def get_dashboard_view_chart_data(chart_ids):
     conn = create_connection()  # Initial connection to your main database
     if conn:
@@ -179,7 +242,7 @@ def get_dashboard_view_chart_data(chart_ids):
 
             for chart_id in chart_ids:
                 cursor = conn.cursor()
-                cursor.execute("SELECT id, database_name, selected_table, x_axis, y_axis, aggregate, chart_type, filter_options, chart_heading,chart_color FROM new_dashboard_details_new WHERE id = %s", (chart_id,))
+                cursor.execute("SELECT id, database_name, selected_table, x_axis, y_axis, aggregate, chart_type, filter_options, chart_heading, chart_color, selectedUser FROM new_dashboard_details_new WHERE id = %s", (chart_id,))
                 chart_data = cursor.fetchone()
                 cursor.close()
 
@@ -194,6 +257,7 @@ def get_dashboard_view_chart_data(chart_ids):
                     chart_heading = chart_data[8]
                     filter_options = chart_data[7]
                     chart_color = chart_data[9]  # Assuming chart_color is a list
+                    selected_user = chart_data[10]  # Extract the selectedUser field
 
                     # Determine the aggregation function
                     aggregate_py = {
@@ -203,6 +267,29 @@ def get_dashboard_view_chart_data(chart_ids):
                         'minimum': 'min',
                         'maximum': 'max'
                     }.get(aggregate, 'sum')  # Default to 'sum' if no match
+
+                    # Check if selectedUser is NULL
+                    if selected_user is None:
+                        # Use the default local connection if selectedUser is NULL
+                        connection = get_db_connection_view(database_name)
+                        print('Using local database connection')
+
+                    else:
+                        # Use external connection if selectedUser is provided
+                        connection = fetch_external_db_connection(database_name, selected_user)
+                        host = connection[3]
+                        dbname = connection[7]
+                        user = connection[4]
+                        password = connection[5]
+
+                        # Create a new psycopg2 connection using the details from the tuple
+                        connection = psycopg2.connect(
+                            dbname=dbname,
+                            user=user,
+                            password=password,
+                            host=host
+                        )
+                        print('External Connection established:', connection)
 
                     # Handle singleValueChart type separately
                     if chart_type == "singleValueChart":
@@ -219,7 +306,7 @@ def get_dashboard_view_chart_data(chart_ids):
                         continue  # Skip further processing for this chart ID
 
                     # Proceed with category and value generation for non-singleValueChart types
-                    connection = get_db_connection_view(database_name)
+                    
                     dataframe = fetch_chart_data(connection, table_name)
                     
                     print("Chart ID", chart_id)

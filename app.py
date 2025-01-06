@@ -235,6 +235,7 @@ def get_bar_chart_route():
     aggregation = data['aggregate']
     checked_option = data['filterOptions']
     db_nameeee = data['databaseName']
+    selectedUser=data['selectedUser']
     chart_data=data['chartType']
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
@@ -281,7 +282,7 @@ def get_bar_chart_route():
             return jsonify({"error": str(e)})
     
     if len(x_axis_columns) == 2 and chart_data == "duealbarChart":    # Handle dual X-axis scenario
-            data = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+            data = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
             
             # Return categories and series for dual X-axis chart
             return jsonify({
@@ -333,7 +334,7 @@ def get_bar_chart_route():
 
 
     elif len(y_axis_columns) == 2:
-        datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         
         data = {
             "categories": [row[0] for row in datass],
@@ -379,15 +380,16 @@ def get_edit_chart_route():
     aggregation = data['aggregate']
     checked_option = data['filterOptions'] 
     db_nameeee = data['databaseName']
+    selectedUser=data['selectedUser']
     print(".......................................",data)
     print(".......................................db_nameeee",db_nameeee)
     print(".......................................checked_option",checked_option)
     print("......................................xAxis.",x_axis_columns)
     print(".......................................yAxis",y_axis_columns)
     print(".......................................table_name",table_name)
-    
+    print('......................................selectedUser',selectedUser)
     if len(y_axis_columns) == 1:
-        data = edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        data = edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         print("data====================", data)     
         categories = {}  
         for row in data:
@@ -524,24 +526,24 @@ def get_filter_options(selectedTable, columnName):
     table_name = selectedTable
     column_name = columnName
     db_name = request.args.get('databaseName')
-    connection_type = request.args.get('connectionType', 'local')  # Default to 'local' if not specified
+    selectedUser = request.args.get('selectedUser','null')  # Default to 'local' if not specified
 
     print("table_name====================", table_name)
     print("db_name====================", db_name)
     print("column_name====================", column_name)
-    print("connection_type====================", connection_type)
+    print("connection_type====================", selectedUser)
 
     # Fetch data from cache or database
-    column_data = fetch_column_name_with_cache(table_name, column_name, db_name, connection_type)
+    column_data = fetch_column_name_with_cache(table_name, column_name, db_name, selectedUser)
     
     print("column_data====================", column_data)
     return jsonify(column_data)
 
 
 @lru_cache(maxsize=128)
-def fetch_column_name_with_cache(table_name, column_name, db_name, connection_type):
+def fetch_column_name_with_cache(table_name, column_name, db_name, selectedUser):
     print("Fetching from database...")
-    return fetch_column_name(table_name, column_name, db_name, connection_type)
+    return fetch_column_name(table_name, column_name, db_name,selectedUser)
 
 @app.route('/clear_cache', methods=['POST'])
 def clear_cache():
@@ -570,7 +572,8 @@ def create_table():
                 chart_color VARCHAR,
                 chart_heading VARCHAR,
                 drilldown_chart_color VARCHAR,
-                filter_options VARCHAR
+                filter_options VARCHAR,
+                selectedUser VARCHAR
             )
         """)
         conn.commit()
@@ -585,13 +588,13 @@ def save_data():
     data = request.json
     user_id=data['user_id']
     save_name= data['saveName']
-    company_name=data['company_name']   
-    
+    company_name=data['company_name']   \
     
     print("company_name====================",company_name)  
     print("user_id====================",user_id)
     print("save_name====================", save_name)
     print("connectionType====================", data)
+   
     create_table()
     
     try:
@@ -612,9 +615,10 @@ def save_data():
                 chart_color,
                 chart_heading,
                 drilldown_chart_color,
-                filter_options
+                filter_options,
+                selectedUser
             ) VALUES (
-                %s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s
             )
         """, (
             data.get('user_id'),
@@ -629,7 +633,8 @@ def save_data():
             data.get('chartColor'),
             chart_heading_json,
             data.get('drillDownChartColor'),
-            data.get('filterOptions')
+            data.get('filterOptions'),
+            data.get('selectedUser')
         ))
         
         conn.commit()
@@ -819,9 +824,9 @@ def get_chart_data(chart_name):
     if conn:
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, selected_table, x_axis, y_axis, aggregate, chart_type, chart_color, chart_heading, drilldown_chart_color, filter_options, database_name FROM new_dashboard_details_new WHERE chart_name = %s", (chart_name,))
+            cursor.execute("SELECT id, selected_table, x_axis, y_axis, aggregate, chart_type, chart_color, chart_heading, drilldown_chart_color, filter_options, database_name ,selecteduser FROM new_dashboard_details_new WHERE chart_name = %s", (chart_name,))
             data = cursor.fetchone()
-            
+            print("data",data)
             if data is None:
                 print(f"No data found for Chart ID: {chart_name}")
                 return None
@@ -1090,7 +1095,9 @@ def receive_single_value_chart_data():
     x_axis = data.get('text_y_xis')[0]
     databaseName = data.get('text_y_database')
     table_Name = data.get('text_y_table')
+    selectedUser=data.get("selectedUser")
     print("table_Name====================",table_Name)
+    print("selectedUser====================",selectedUser)
     aggregate=data.get('text_y_aggregate')
     print("x_axis====================",x_axis)  
     print("databaseName====================",databaseName)  
@@ -1103,7 +1110,7 @@ def receive_single_value_chart_data():
                     'minimum': 'min',
                     'maximum': 'max'
                 }.get(aggregate, 'sum') 
-    fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate_py)
+    fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate_py,selectedUser)
     print("Fetched Data:", fetched_data)
     print(f"Received x_axis: {x_axis}")
     print(f"Received databaseName: {databaseName}")
@@ -1206,7 +1213,6 @@ def receive_chart_details():
     chart_heading = data.get('chart_heading')
     filter_options = data.get('filter_options').split(', ')  # Convert filter_options string to a list
     databaseName = data.get('databaseName')
-    connectionType=data.get('connectionType')
     company_name=data.get('databaseName')
     print("chart_id====================", chart_id)
     print("tableName====================", tableName)
@@ -1217,7 +1223,7 @@ def receive_chart_details():
     print("chart_heading====================", chart_heading)
     print("filter_options====================", filter_options)
     print("databaseName====================", databaseName)
-    print("connectionType",connectionType)
+   
     # Define aggregate function based on request
     aggregate_py = {
         'count': 'count',
@@ -1228,26 +1234,59 @@ def receive_chart_details():
     }.get(aggregate, 'sum')  # Default to 'sum' if no match
 
     try:
-        # Get the database connection
+        connection =get_db_connection()
+        
+        # Fetch selectedUser from the database based on chart_id
+        query = f"SELECT selectedUser FROM new_dashboard_details_new WHERE id = %s"
+        cursor = connection.cursor()
+        cursor.execute(query, (chart_id,))
+        selectedUser = cursor.fetchone()
+        print("selectedUser",selectedUser)
         # connection = get_db_connection_view(databaseName)
         # df = fetch_chart_data(connection, tableName)
-        if connectionType == 'external':
-            connection = fetch_external_db_connection(company_name)  # Custom logic for 'external' connection type
-            host = connection[2]
-            dbname = connection[6]
-            user = connection[3]
-            password = connection[4]
-            
-            # Create a new psycopg2 connection using the details from the tuple
-            connection = psycopg2.connect(
-                dbname=dbname,
-                user=user,
-                password=password,
-                host=host
-            )
-            print('External Connection established:', connection)
-        else:
+        if selectedUser is None:
+            print("No selectedUser found for this chart_id.")
             connection = get_db_connection_view(databaseName)
+        else:
+            selectedUser = selectedUser[0]  # Extract the actual value from the tuple
+            print("Fetched selectedUser:", selectedUser)
+
+
+            # savename=data.get('selectedUser')
+            # print("savename",savename)
+            # connection = fetch_external_db_connection(company_name,savename)  # Custom logic for 'external' connection type
+            # host = connection[3]
+            # dbname = connection[7]
+            # user = connection[4]
+            # password = connection[5]
+            
+            # # Create a new psycopg2 connection using the details from the tuple
+            # connection = psycopg2.connect(
+            #     dbname=dbname,
+            #     user=user,
+            #     password=password,
+            #     host=host
+            # )
+            # print('External Connection established:', connection)
+        
+            if selectedUser:
+                connection = fetch_external_db_connection(company_name, selectedUser)
+                host = connection[3]
+                dbname = connection[7]
+                user = connection[4]
+                password = connection[5]
+
+                # Create a new psycopg2 connection using the details from the tuple
+                connection = psycopg2.connect(
+                    dbname=dbname,
+                    user=user,
+                    password=password,
+                    host=host
+                )
+                print('External Connection established:', connection)
+            else:
+                print("No valid selectedUser found.")
+                connection = get_db_connection_view(databaseName)
         df = fetch_chart_data(connection, tableName)
         print(df.head())
         if chart_type == 'wordCloud':
@@ -1637,7 +1676,7 @@ def fetch_categories():
 
 @app.route('/api/users', methods=['GET'])
 def get_all_users():
-    company_name = request.args.get('companyName')
+    company_name = request.args.get('')
     print("company_name====================",company_name)
     page = int(request.args.get('page', 1))  # Default to page 1 if not provided
     limit = int(request.args.get('limit', 10))  # Default to 10 users per page
@@ -2465,7 +2504,7 @@ def connect_and_fetch_tables():
         return jsonify(success=False, error=f"Failed to connect: {str(e)}")
 
 
-def fetch_external_db_connection(company_name):
+def fetch_external_db_connection(company_name,savename):
     try:
         print("company_name",company_name)
         # Connect to local PostgreSQL to get external database connection details
@@ -2475,7 +2514,15 @@ def fetch_external_db_connection(company_name):
         )
         print("conn",conn)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM external_db_connections ORDER BY created_at DESC LIMIT 1;")
+        query = """
+            SELECT * 
+            FROM external_db_connections 
+            WHERE savename = %s 
+            ORDER BY created_at DESC 
+            LIMIT 1;
+        """
+        print("query",query)
+        cursor.execute(query, (savename,))
         connection_details = cursor.fetchone()
         conn.close()
         return connection_details
@@ -2561,15 +2608,19 @@ def fetch_table_names_from_external_db(db_details):
 def get_external_db_table_names():
     
     company_name = request.args.get('databaseName')
+    savename=request.args.get('user')
     print("companydb", company_name)
-    external_db_connection = fetch_external_db_connection(company_name)
+    print("savename", savename)
+    external_db_connection = fetch_external_db_connection(company_name, savename)
+    print("External DB Connection Details:", external_db_connection)
+
     if external_db_connection:
         db_details = {
-            "host": external_db_connection[2],
-            "database": external_db_connection[6],
-            "user": external_db_connection[3],
-            "password": external_db_connection[4],
-            "dbType": external_db_connection[1]
+            "host": external_db_connection[3],
+            "database": external_db_connection[7],
+            "user": external_db_connection[4],
+            "password": external_db_connection[5],
+            "dbType": external_db_connection[2]
         }
         table_names = fetch_table_names_from_external_db(db_details)
         return jsonify(table_names)
@@ -2578,15 +2629,17 @@ def get_external_db_table_names():
 @app.route('/external-db/tables/<table_name>', methods=['GET'])
 def get_externaltable_data(table_name):
     company_name = request.args.get('databaseName')
+    savename=request.args.get('user')
     print("companydb", company_name)
-    external_db_connection = fetch_external_db_connection(company_name)
+    print("username", savename)
+    external_db_connection = fetch_external_db_connection(company_name,savename)
     if external_db_connection:
         db_details = {
-            "host": external_db_connection[2],
-            "database": external_db_connection[6],
-            "user": external_db_connection[3],
-            "password": external_db_connection[4],
-            "dbType": external_db_connection[1]
+             "host": external_db_connection[3],
+            "database": external_db_connection[7],
+            "user": external_db_connection[4],
+            "password": external_db_connection[5],
+            "dbType": external_db_connection[2]
         }
         try:
             # Fetch data from the specified table
@@ -2664,6 +2717,46 @@ def fetch_data_from_table(db_details, table_name):
             conn.close()
 
 
+@app.route('/api/dbusers', methods=['GET'])
+def fetch_saved_names():
+    company_name = request.args.get('databaseName')  # Get the company name from the request
+    print("Received databaseName:", company_name)  # Debugging
+
+    if not company_name:
+        print("Company name is missing!")  # Log this case
+        return jsonify({'error': 'Company name is required'}), 400
+
+    try:
+        conn = psycopg2.connect(
+            dbname=company_name,  # Ensure this points to the correct company database
+            user=USER_NAME,
+            password=PASSWORD,
+            host=HOST,
+            port=PORT
+        )
+        cursor = conn.cursor()
+
+        # Fetch saveName from the external_db_connections table
+        cursor.execute("SELECT id, saveName FROM external_db_connections")
+        results = cursor.fetchall()
+        # Modify the response format in the Flask backend
+
+        print("result",results)
+        # Close the database connection
+        cursor.close()
+        conn.close()
+
+        # Return the results as JSON
+        # return jsonify(results)
+        return jsonify([{'id': row[0], 'saveName': row[1]} for row in results])
+
+
+    except psycopg2.Error as db_error:
+        print(f"Database connection error: {db_error}")
+        return jsonify({'error': 'Database connection failed'}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 

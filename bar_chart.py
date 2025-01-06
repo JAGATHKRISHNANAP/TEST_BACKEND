@@ -243,11 +243,11 @@ def get_column_names(db_name, username, password, table_name, host='localhost', 
             connection_details = fetch_external_db_connection(db_name)
             if connection_details:
                 db_details = {
-                    "host": connection_details[2],
-                    "database": connection_details[6],
-                    "user": connection_details[3],
-                    "password": connection_details[4],
-                    "port": int(connection_details[5])
+                    "host": connection_details[3],
+                    "database": connection_details[7],
+                    "user": connection_details[4],
+                    "password": connection_details[5],
+                    "port": int(connection_details[6])
 
                 }
             if not connection_details:
@@ -339,51 +339,151 @@ def fetch_external_db_connection(db_name):
 
 
 
-def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
+# def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
+#     global global_df
+
+#     if global_df is None:
+#         print("Fetching data from the database...")
+#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+#         cur = conn.cursor()
+#         query = f"SELECT * FROM {table_name}"
+#         cur.execute(query)
+#         data = cur.fetchall()
+#         colnames = [desc[0] for desc in cur.description]
+#         cur.close()
+#         conn.close()
+
+#         global_df = pd.DataFrame(data, columns=colnames)
+#         print("Full DataFrame:")
+#         print(global_df[y_axis_column[0]])
+
+#         global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+#         print(f"global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')")
+
+#     else:
+#         global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+
+#     if aggregation == "sum":
+#         aggregation_func = "sum"
+#     elif aggregation == "average":
+#         aggregation_func = "mean"
+#     elif aggregation == "count":
+#         aggregation_func = "count"
+#     elif aggregation == "maximum":
+#         aggregation_func = "max"
+#     elif aggregation == "minimum":
+#         aggregation_func = "min"
+        
+#     x_axis_columns_str = x_axis_columns
+#     # print("The x axis columns are:", x_axis_columns_str)
+#     options = [option.strip() for option in checked_option.split(',')]
+#     # print("The options are:", options)
+#     filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
+#     grouped_df = filtered_df.groupby(x_axis_columns_str[0]).agg({y_axis_column[0]: aggregation_func}).reset_index()
+    
+#     result = [tuple(x) for x in grouped_df.to_numpy()]
+    
+#     return result
+def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name, selectedUser):
     global global_df
 
     if global_df is None:
         print("Fetching data from the database...")
-        conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
-        cur = conn.cursor()
-        query = f"SELECT * FROM {table_name}"
-        cur.execute(query)
-        data = cur.fetchall()
-        colnames = [desc[0] for desc in cur.description]
-        cur.close()
-        conn.close()
+        try:
+            # Establish database connection
+            if not selectedUser or selectedUser.lower() == 'null':
+                print("Using default database connection...")
+                connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
+                conn = psycopg2.connect(connection_string)
+            else:
+                print(f"Using connection for user: {selectedUser}")
+                connection_string = fetch_external_db_connection(db_name)
+                if not connection_string:
+                    raise Exception("Unable to fetch external database connection details.")
 
-        global_df = pd.DataFrame(data, columns=colnames)
-        print("Full DataFrame:")
-        print(global_df[y_axis_column[0]])
+                db_details = {
+                    "host": connection_string[3],
+                    "database": connection_string[7],
+                    "user": connection_string[4],
+                    "password": connection_string[5],
+                    "port": int(connection_string[6])
+                }
 
-        global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
-        print(f"global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')")
+                conn = psycopg2.connect(
+                    dbname=db_details['database'],
+                    user=db_details['user'],
+                    password=db_details['password'],
+                    host=db_details['host'],
+                    port=db_details['port']
+                )
 
+            cur = conn.cursor()
+            query = f"SELECT * FROM {table_name}"
+            cur.execute(query)
+            data = cur.fetchall()
+            colnames = [desc[0] for desc in cur.description]
+
+            # Create a pandas DataFrame from the fetched data
+            global_df = pd.DataFrame(data, columns=colnames)
+
+            print("Full DataFrame:")
+            print(global_df)
+
+            # Ensure the y-axis column is numeric
+            if y_axis_column[0] in global_df.columns:
+                global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+                print(f"Converted {y_axis_column[0]} to numeric values.")
+            else:
+                raise KeyError(f"Column '{y_axis_column[0]}' not found in the table.")
+
+        except Exception as e:
+            print(f"Error while fetching data from the database: {e}")
+            return None
+        finally:
+            if 'cur' in locals() and cur:
+                cur.close()
+            if 'conn' in locals() and conn:
+                conn.close()
     else:
-        global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+        # Ensure the y-axis column is numeric in the existing DataFrame
+        if y_axis_column[0] in global_df.columns:
+            global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+        else:
+            print(f"Column '{y_axis_column[0]}' not found in the global DataFrame.")
+            return None
 
-    if aggregation == "sum":
-        aggregation_func = "sum"
-    elif aggregation == "average":
-        aggregation_func = "mean"
-    elif aggregation == "count":
-        aggregation_func = "count"
-    elif aggregation == "maximum":
-        aggregation_func = "max"
-    elif aggregation == "minimum":
-        aggregation_func = "min"
-        
-    x_axis_columns_str = x_axis_columns
-    # print("The x axis columns are:", x_axis_columns_str)
-    options = [option.strip() for option in checked_option.split(',')]
-    # print("The options are:", options)
-    filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
-    grouped_df = filtered_df.groupby(x_axis_columns_str[0]).agg({y_axis_column[0]: aggregation_func}).reset_index()
-    
-    result = [tuple(x) for x in grouped_df.to_numpy()]
-    
-    return result
+    try:
+        # Define the aggregation function
+        aggregation_func_map = {
+            "sum": "sum",
+            "average": "mean",
+            "count": "count",
+            "maximum": "max",
+            "minimum": "min"
+        }
+        aggregation_func = aggregation_func_map.get(aggregation.lower())
+        if not aggregation_func:
+            raise ValueError(f"Invalid aggregation type: {aggregation}")
+
+        # Validate x-axis columns and options
+        if not x_axis_columns or not y_axis_column:
+            raise ValueError("x_axis_columns and y_axis_column must not be empty.")
+
+        if x_axis_columns[0] not in global_df.columns:
+            raise KeyError(f"Column '{x_axis_columns[0]}' not found in the DataFrame.")
+
+        # Filter and group the DataFrame
+        options = [option.strip() for option in checked_option.split(',')]
+        filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
+        grouped_df = filtered_df.groupby(x_axis_columns[0]).agg({y_axis_column[0]: aggregation_func}).reset_index()
+
+        # Convert the grouped DataFrame to a list of tuples
+        result = [tuple(x) for x in grouped_df.to_numpy()]
+        return result
+
+    except Exception as e:
+        print(f"Error during data processing: {e}")
+        return None
 
 
 import psycopg2
@@ -495,7 +595,7 @@ def count_function(table_name, x_axis_columns, checked_option, y_axis_column, ag
 
 
 
-def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
+def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name,selectedUser):
     global global_df
     print("table_name:", table_name)
     print("x_axis_columns:", x_axis_columns)
@@ -504,14 +604,37 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
 
     if global_df is None:
         print("Fetching data from the database...")
-        conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
-        cur = conn.cursor()
+        if not selectedUser or selectedUser.lower() == 'null':
+                print("Using default database connection...")
+                connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
+                connection = psycopg2.connect(connection_string)
+        else:  # External connection
+                connection_details = fetch_external_db_connection(db_name)
+                if connection_details:
+                    db_details = {
+                        "host": connection_details[3],
+                        "database": connection_details[7],
+                        "user": connection_details[4],
+                        "password": connection_details[5],
+                        "port": int(connection_details[6])
+                    }
+                if not connection_details:
+                    raise Exception("Unable to fetch external database connection details.")
+                
+                connection = psycopg2.connect(
+                    dbname=db_details['database'],
+                    user=db_details['user'],
+                    password=db_details['password'],
+                    host=db_details['host'],
+                    port=db_details['port'],
+                )
+        cur = connection.cursor()
         query = f"SELECT * FROM {table_name}"
         cur.execute(query)
         data = cur.fetchall()
         colnames = [desc[0] for desc in cur.description]
         cur.close()
-        conn.close()
+        connection.close()
 
         global_df = pd.DataFrame(data, columns=colnames)
         print("*********************************************************************************", global_df)
@@ -596,8 +719,36 @@ def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):
 
 
 
-def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column,aggregation,db_nameeee):
-    conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
+def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column,aggregation,db_nameeee,selectedUser):
+    # conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
+    # cur = conn.cursor()
+    # if selectedUser == 'null':
+    #     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
+    if not selectedUser or selectedUser.lower() == 'null':
+                print("Using default database connection...")
+                connection_string = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+                conn = psycopg2.connect(connection_string)
+    else:  # External connection
+        connection_details = fetch_external_db_connection(db_nameeee)
+        if connection_details:
+            db_details = {
+                "host": connection_details[3],
+                "database": connection_details[7],
+                "user": connection_details[4],
+                "password": connection_details[5],
+                "port": int(connection_details[6])
+            }
+        if not connection_details:
+            raise Exception("Unable to fetch external database connection details.")
+        
+        conn = psycopg2.connect(
+            dbname=db_details['database'],
+            user=db_details['user'],
+            password=db_details['password'],
+            host=db_details['host'],
+            port=db_details['port'],
+        )
+    
     cur = conn.cursor()
     if aggregation == "sum":
         aggregation = "SUM"
@@ -627,21 +778,21 @@ def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column
     cur.close()
     conn.close()
     return rows
-def fetch_column_name(table_name, x_axis_columns, db_name, connection_type='local'):
-    print("connection_type:", connection_type)
+def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
+    print("connection_type:", selectedUser)
     
     # Connect to the appropriate database based on connection_type
-    if connection_type == 'local':
+    if selectedUser == 'null':
         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
     else:  # External connection
         connection_details = fetch_external_db_connection(db_name)
         if connection_details:
             db_details = {
-                "host": connection_details[2],
-                "database": connection_details[6],
-                "user": connection_details[3],
-                "password": connection_details[4],
-                "port": int(connection_details[5])
+                "host": connection_details[3],
+                "database": connection_details[7],
+                "user": connection_details[4],
+                "password": connection_details[5],
+                "port": int(connection_details[6])
             }
         if not connection_details:
             raise Exception("Unable to fetch external database connection details.")
@@ -657,6 +808,7 @@ def fetch_column_name(table_name, x_axis_columns, db_name, connection_type='loca
     cur = conn.cursor()
 
     query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}"
+    print("querty",query)
     cur.execute(query)
     rows = cur.fetchall()
     cur.close()
@@ -770,13 +922,37 @@ def perform_calculation(dataframe, columnName, calculation):
 
 
 
-def fetchText_data(databaseName, table_Name, x_axis, aggregate_py):
+def fetchText_data(databaseName, table_Name, x_axis, aggregate_py,selectedUser):
     print("aggregate===========================>>>>", aggregate_py)   
     print(table_Name)
+    
 
-
-    # Connect to the database
-    conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
+    # # Connect to the database
+    # conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
+    # cur = conn.cursor()
+    if selectedUser == None:
+        conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
+    else:  # External connection
+        connection_details = fetch_external_db_connection(db_name={databaseName})
+        if connection_details:
+            db_details = {
+                "host": connection_details[3],
+                "database": connection_details[7],
+                "user": connection_details[4],
+                "password": connection_details[5],
+                "port": int(connection_details[6])
+            }
+        if not connection_details:
+            raise Exception("Unable to fetch external database connection details.")
+        
+        conn = psycopg2.connect(
+            dbname=db_details['database'],
+            user=db_details['user'],
+            password=db_details['password'],
+            host=db_details['host'],
+            port=db_details['port'],
+        )
+    
     cur = conn.cursor()
 
     # Check the data type of the x_axis column
