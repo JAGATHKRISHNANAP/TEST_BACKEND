@@ -1973,6 +1973,7 @@ def get_predictions():
     print("timePeriod:", timePeriod, "number_of_periods:", number_of_periods)
     prediction_data = load_and_predict(x_axis, y_axis,number_of_periods,timePeriod)
     # prediction_data = load_and_predict(x_axis, y_axis)
+    print("prediction_data:", prediction_data)
     return jsonify(prediction_data)  # Return data as JSON
 
 @app.route('/Hierarchial-backend-endpoint', methods=['POST', 'GET'])
