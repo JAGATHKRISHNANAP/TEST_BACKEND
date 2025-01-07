@@ -176,10 +176,10 @@ def get_table_names():
 
 @app.route('/column_names/<table_name>',methods=['GET'] )
 def get_columns(table_name):
-    db_nameeee= request.args.get('databaseName')
+    db_name= request.args.get('databaseName')
     connectionType= request.args.get('connectionType')
     print("connectionType",connectionType)
-    column_names = get_column_names(db_nameeee, username, password, table_name, host, port,connectionType)
+    column_names = get_column_names(db_name, username, password, table_name, host, port,connectionType)
     print("column_names====================",column_names)
     return jsonify(column_names)
 
@@ -242,11 +242,11 @@ def get_bar_chart_route():
     print("data====================", data)
     if len(y_axis_columns) == 0 and chart_data == "wordCloud": 
         # Handle WordCloud scenario
-        x_axis_columns_str = ', '.join(x_axis_columns)
+        
         query = f"""
             SELECT word, COUNT(*) AS word_count
             FROM (
-                SELECT regexp_split_to_table({x_axis_columns_str}, '\\s+') AS word
+                SELECT regexp_split_to_table('{checked_option}', '\\s+') AS word
                 FROM {table_name}
             ) AS words
             GROUP BY word
@@ -256,7 +256,32 @@ def get_bar_chart_route():
         
         try:
             # Execute the query
-            connection = get_db_connection(db_nameeee)
+            # connection = get_db_connection(db_nameeee)
+            if not selectedUser or selectedUser.lower() == 'null':
+                print("Using default database connection...")
+                connection_string = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+                connection = psycopg2.connect(connection_string)
+            else:  # External connection
+                savename=data['selectedUser']
+                connection_details = fetch_external_db_connection(db_nameeee,savename)
+                if connection_details:
+                    db_details = {
+                        "host": connection_details[3],
+                        "database": connection_details[7],
+                        "user": connection_details[4],
+                        "password": connection_details[5],
+                        "port": int(connection_details[6])
+                    }
+                if not connection_details:
+                    raise Exception("Unable to fetch external database connection details.")
+                
+                connection = psycopg2.connect(
+                    dbname=db_details['database'],
+                    user=db_details['user'],
+                    password=db_details['password'],
+                    host=db_details['host'],
+                    port=db_details['port'],
+                )
             cursor = connection.cursor()
             cursor.execute(query)
             data = cursor.fetchall()
@@ -303,7 +328,7 @@ def get_bar_chart_route():
         print(f"{y_axis_columns[0]} is not in time format. No conversion applied.")
 
     if len(y_axis_columns) == 1:
-        data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         
         if aggregation == "count":
             print("Data for count aggregation:", data)
