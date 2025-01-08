@@ -933,7 +933,7 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py,selectedUser):
     if selectedUser == None:
         conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
     else:  # External connection
-        connection_details = fetch_external_db_connection(db_name={databaseName})
+        connection_details = fetch_external_db_connection(databaseName)
         if connection_details:
             db_details = {
                 "host": connection_details[3],
@@ -1056,14 +1056,40 @@ def Hierarchial_drill_down(clicked_category, x_axis_columns, y_axis_column, dept
 
 
 
-def fetch_hierarchical_data(table_name, db_name):
+def fetch_hierarchical_data(table_name, db_name,selectedUser):
     global global_df
 
     if global_df is None:
         print("Fetching data from the database...")
         try:
-            conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+            # conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+            # cur = conn.cursor()
+            if selectedUser == 'null':
+                conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+            else:  # External connection
+                connection_details = fetch_external_db_connection(db_name)
+                if connection_details:
+                    db_details = {
+                        "host": connection_details[3],
+                        "database": connection_details[7],
+                        "user": connection_details[4],
+                        "password": connection_details[5],
+                        "port": int(connection_details[6])
+                    }
+                if not connection_details:
+                    raise Exception("Unable to fetch external database connection details.")
+                
+                conn = psycopg2.connect(
+                    dbname=db_details['database'],
+                    user=db_details['user'],
+                    password=db_details['password'],
+                    host=db_details['host'],
+                    port=db_details['port'],
+                )
+            
             cur = conn.cursor()
+
+            print("conn",conn)
             query = f"SELECT * FROM {table_name}"
             print("query",query)
             cur.execute(query)

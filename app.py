@@ -1945,13 +1945,13 @@ def handle_hierarchical_bar_click():
         table_name = data.get('tableName')
         db_name = data.get('databaseName')
         current_depth = data.get('currentLevel', 0)
-
+        selectedUser=data.get("selectedUser")
         print("Clicked Category:", clicked_category)
         print("X-axis Columns:", x_axis_columns)
 
         try:
             if global_df is None:
-                global_df = fetch_hierarchical_data(table_name, db_name)
+                global_df = fetch_hierarchical_data(table_name, db_name,selectedUser)
                 print("Fetched data:", global_df.head() if global_df is not None else "No data returned")
 
             if global_df is None or global_df.empty:
@@ -2477,6 +2477,122 @@ def get_Edb_connection(username, password, host, port, db_name):
 from pymongo import MongoClient
 import mysql.connector
 import cx_Oracle
+try:
+    cx_Oracle.init_oracle_client(lib_dir="C:\\instantclient-basic-windows.x64-23.6.0.24.10\\instantclient_23_6")  # Update the path for your system
+except cx_Oracle.InterfaceError as e:
+    if "already been initialized" in str(e):
+        print("Oracle Client library has already been initialized. Skipping re-initialization.")
+    else:
+        raise e
+# @app.route('/connect', methods=['POST'])
+# def connect_and_fetch_tables():
+#     data = request.json
+#     dbType = data.get('dbType')
+#     username = data.get('username')
+#     password = data.get('password')
+#     host = data.get('host', 'localhost')  # Default to localhost if not provided
+#     port = data.get('port')  # Port should be provided based on the database type
+#     db_name = data.get('dbName')
+#     print("data",data)
+#     try:
+#         if dbType == "PostgreSQL":
+#             # Connect to PostgreSQL
+#             conn = psycopg2.connect(
+#                 dbname=db_name, user=username, password=password, host=host, port=port
+#             )
+#             cursor = conn.cursor()
+#             cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+#             tables = [row[0] for row in cursor.fetchall()]
+#             conn.close()
+#         elif dbType == "MongoDB":
+#             # Connect to MongoDB
+#             mongo_uri = f"mongodb://{username}:{password}@{host}:{port}/{db_name}"
+#             client = MongoClient(mongo_uri)
+#             db = client[db_name]
+#             tables = db.list_collection_names()
+#         elif dbType == "MySQL":
+#             # Connect to MySQL
+#             conn = mysql.connector.connect(
+#                 host=host, user=username, password=password, database=db_name, port=port
+#             )
+#             cursor = conn.cursor()
+#             cursor.execute("SHOW TABLES;")
+#             tables = [row[0] for row in cursor.fetchall()]
+#             conn.close()
+#         # elif dbType == "Oracle":
+#         #     # Connect to Oracle
+#         #     dsn = cx_Oracle.makedsn(host, port, service_name=db_name)
+#         #     conn = cx_Oracle.connect(user=username, password=password, dsn=dsn)
+#         #     cursor = conn.cursor()
+#         #     cursor.execute("SELECT table_name FROM all_tables")
+#         #     tables = [row[0] for row in cursor.fetchall()]
+#         #     conn.close()
+#         if dbType == "Oracle":
+#             try:
+#                 import cx_Oracle
+
+#                 # Ensure the Oracle Instant Client is correctly configured
+#                 cx_Oracle.init_oracle_client(lib_dir="C:\instantclient-basic-windows.x64-23.6.0.24.10\instantclient_23_6")  # Update this path for your system
+                
+#                 # Connect to Oracle
+#                 conn = cx_Oracle.connect(
+#                     user=username,
+#                     password=password,
+#                     dsn=f"{host}:{port}/{db_name}"  # For Oracle, the DSN includes host, port, and service name
+#                 )
+#                 cursor = conn.cursor()
+#                 print("Connection successful:", conn)
+
+#                 # Query to get all table names from the current schema
+#                 cursor.execute("""
+#                     SELECT table_name 
+#                     FROM all_tables 
+#                     WHERE owner = :schema_name
+#                 """, {"schema_name": username.upper()})  # Pass parameter as a dictionary
+
+#                 tables = [row[0] for row in cursor.fetchall()]
+#                 conn.close()
+            
+#             except cx_Oracle.DatabaseError as e:
+#                 print(f"Oracle Database Error: {str(e)}")
+#                 raise e
+            
+#             except cx_Oracle.InterfaceError as e:
+#                 print("DPI-1047 detected. Switching to oracledb if available.")
+#                 try:
+#                     import oracledb
+
+#                     # Using oracledb as a fallback
+#                     conn = oracledb.connect(
+#                         user=username,
+#                         password=password,
+#                         dsn=f"{host}:{port}/{db_name}"
+#                     )
+#                     cursor = conn.cursor()
+#                     print("Connection successful with oracledb:", conn)
+
+#                     # Query to get all table names from the current schema
+#                     cursor.execute("""
+#                         SELECT table_name 
+#                         FROM all_tables 
+#                         WHERE owner = :schema_name
+#                     """, {"schema_name": username.upper()})  # Pass parameter as a dictionary
+
+#                     tables = [row[0] for row in cursor.fetchall()]
+#                     conn.close()
+#                 except Exception as fallback_error:
+#                     return jsonify(success=False, error=f"Failed to connect using oracledb: {str(fallback_error)}")
+            
+#             except Exception as general_error:
+#                 return jsonify(success=False, error=f"Failed to connect: {str(general_error)}")
+
+#         else:
+#             return jsonify(success=False, error="Unsupported database type.")
+
+        
+#         return jsonify(success=True, tables=tables)
+#     except Exception as e:
+#         return jsonify(success=False, error=f"Failed to connect: {str(e)}")
 
 @app.route('/connect', methods=['POST'])
 def connect_and_fetch_tables():
@@ -2487,9 +2603,47 @@ def connect_and_fetch_tables():
     host = data.get('host', 'localhost')  # Default to localhost if not provided
     port = data.get('port')  # Port should be provided based on the database type
     db_name = data.get('dbName')
+    print("data", data)
 
     try:
-        if dbType == "PostgreSQL":
+        if dbType == "Oracle":
+            # Connect to Oracle
+            # conn = cx_Oracle.connect(
+            #     user=username,
+            #     password=password,
+            #     dsn=f"{host}:{port}/{db_name}"  # For Oracle, the DSN includes host, port, and service name
+            # )
+            # cursor = conn.cursor()
+            # print("Connection successful:", conn)
+            if username.lower() == "sys":
+                conn = cx_Oracle.connect(
+                    user=username,
+                    password=password,
+                    dsn=f"{host}:{port}/{db_name}",
+                    mode=cx_Oracle.SYSDBA  # Use SYSDBA mode for SYS user
+                )
+            else:
+                conn = cx_Oracle.connect(
+                    user=username,
+                    password=password,
+                    dsn=f"{host}:{port}/{db_name}"
+                )
+
+            cursor = conn.cursor()
+            print("Connection successful:", conn)
+
+            # Query to get all table names from the current schema
+            cursor.execute("""
+                SELECT table_name 
+                FROM all_tables 
+                WHERE owner = :schema_name
+            """, {"schema_name": username.upper()})  # Pass parameter as a dictionary
+
+            tables = [row[0] for row in cursor.fetchall()]
+            conn.close()
+
+        elif dbType == "PostgreSQL":
+            import psycopg2
             # Connect to PostgreSQL
             conn = psycopg2.connect(
                 dbname=db_name, user=username, password=password, host=host, port=port
@@ -2498,13 +2652,17 @@ def connect_and_fetch_tables():
             cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
             tables = [row[0] for row in cursor.fetchall()]
             conn.close()
+
         elif dbType == "MongoDB":
+            from pymongo import MongoClient
             # Connect to MongoDB
             mongo_uri = f"mongodb://{username}:{password}@{host}:{port}/{db_name}"
             client = MongoClient(mongo_uri)
             db = client[db_name]
             tables = db.list_collection_names()
+
         elif dbType == "MySQL":
+            import mysql.connector
             # Connect to MySQL
             conn = mysql.connector.connect(
                 host=host, user=username, password=password, database=db_name, port=port
@@ -2513,18 +2671,18 @@ def connect_and_fetch_tables():
             cursor.execute("SHOW TABLES;")
             tables = [row[0] for row in cursor.fetchall()]
             conn.close()
-        elif dbType == "Oracle":
-            # Connect to Oracle
-            dsn = cx_Oracle.makedsn(host, port, service_name=db_name)
-            conn = cx_Oracle.connect(user=username, password=password, dsn=dsn)
-            cursor = conn.cursor()
-            cursor.execute("SELECT table_name FROM all_tables")
-            tables = [row[0] for row in cursor.fetchall()]
-            conn.close()
+
         else:
             return jsonify(success=False, error="Unsupported database type.")
-        
+
         return jsonify(success=True, tables=tables)
+
+    except cx_Oracle.DatabaseError as e:
+        return jsonify(success=False, error=f"Oracle Database Error: {str(e)}")
+
+    except cx_Oracle.InterfaceError as e:
+        return jsonify(success=False, error=f"Oracle Interface Error: {str(e)}")
+
     except Exception as e:
         return jsonify(success=False, error=f"Failed to connect: {str(e)}")
 
@@ -2609,12 +2767,23 @@ def fetch_table_names_from_external_db(db_details):
             conn.close()
         elif db_type == "Oracle":
             # Connect to Oracle
-            dsn = cx_Oracle.makedsn(
-                db_details['host'], db_details.get('port', 1521), service_name=db_details['database']
-            )
-            conn = cx_Oracle.connect(
-                user=db_details['user'], password=db_details['password'], dsn=dsn
-            )
+             
+            # Connect to Oracle
+            if username.lower() == "sys":
+                conn = cx_Oracle.connect(
+                    user=db_details['user'],
+                    password=db_details['password'],
+                    dsn=f"{db_details['host']}:{db_details.get('port', 1521)}/{db_details['database']}",
+                    mode=cx_Oracle.SYSDBA  # Use SYSDBA mode for SYS user
+                )
+            else:
+                conn = cx_Oracle.connect(
+                    user=db_details['user'],
+                    password=db_details['password'],
+                    dsn=f"{db_details['host']}:{db_details.get('port', 1521)}/{db_details['database']}"
+                )
+
+            cursor = conn.cursor()
             cursor = conn.cursor()
             cursor.execute("SELECT table_name FROM all_tables")
             table_names = [table[0] for table in cursor.fetchall()]
@@ -2645,7 +2814,8 @@ def get_external_db_table_names():
             "database": external_db_connection[7],
             "user": external_db_connection[4],
             "password": external_db_connection[5],
-            "dbType": external_db_connection[2]
+            "dbType": external_db_connection[2],
+            "port": external_db_connection[6],
         }
         table_names = fetch_table_names_from_external_db(db_details)
         return jsonify(table_names)
@@ -2664,7 +2834,8 @@ def get_externaltable_data(table_name):
             "database": external_db_connection[7],
             "user": external_db_connection[4],
             "password": external_db_connection[5],
-            "dbType": external_db_connection[2]
+            "dbType": external_db_connection[2],
+            "port": external_db_connection[6],
         }
         try:
             # Fetch data from the specified table
@@ -2720,11 +2891,18 @@ def fetch_data_from_table(db_details, table_name):
                 port=db_details["port"]
             )
         elif dbType == "Oracle":
-            dsn = cx_Oracle.makedsn(
-                db_details["host"], db_details["port"], service_name=db_details["database"]
-            )
-            conn = cx_Oracle.connect(
-                user=db_details["user"], password=db_details["password"], dsn=dsn
+            if db_details["user"].lower() == "sys":
+                conn = cx_Oracle.connect(
+                    user=db_details["user"],
+                    password=db_details["password"],
+                    dsn=f"{db_details['host']}:{db_details.get['port']}/{db_details['database']}",
+                    mode=cx_Oracle.SYSDBA  # Use SYSDBA mode for SYS user
+                )
+            else:
+                conn = cx_Oracle.connect(
+                user=db_details["user"],
+                password=db_details["password"],
+                dsn=f"{db_details['host']}:{db_details['port']}/{db_details['database']}"
             )
         else:
             raise Exception("Unsupported database type.")
