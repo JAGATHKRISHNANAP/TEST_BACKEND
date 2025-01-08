@@ -409,6 +409,9 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
                         col_type = 'NUMERIC'
                     # elif pd.to_datetime(df[col].dropna(), errors='coerce').notna().all():
                     #     col_type = 'DATE'
+                    elif pd.to_datetime(df[col].dropna(), errors='coerce').notna().all():
+                        df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
+                        col_type = 'DATE'
                     else:
                         col_type = 'VARCHAR'  # Default to VARCHAR for mixed or empty columns
 
@@ -439,6 +442,9 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
                         col_type = 'NUMERIC'
                     # elif pd.to_datetime(df[col].dropna(), errors='coerce').notna().all():
                     #     col_type = 'DATE'
+                    elif pd.to_datetime(df[col].dropna(), errors='coerce').notna().all():
+                        df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
+                        col_type = 'DATE'
                     else:
                         col_type = 'VARCHAR'  # Default to VARCHAR for mixed or empty columns
                     

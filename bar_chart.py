@@ -4,6 +4,9 @@ import psycopg2
 import pandas as pd
 from config import USER_NAME, DB_NAME, PASSWORD, HOST, PORT
 
+from datetime import datetime
+
+
 from sqlalchemy import create_engine
 
 
@@ -515,20 +518,29 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
 
     x_axis_columns_str = x_axis_columns
     options = [option.strip() for option in checked_option.split(',')]
-
+    print("options----------+**********+---------:", options)
     # Convert options to strings for comparison
     options = list(map(str, options))
+    print("options----------+++++++---------:", options)
+
+    print("temp_df:", temp_df[x_axis_columns[0]])
+#     formatted_dates = temp_df[x_axis_columns[0]].apply(
+#     lambda date_str: datetime.strptime(date_str, '%Y-%m-%d').strftime('%a, %d %b %Y 00:00:00 GMT')
+# )
+#     print("temp_df------:", formatted_dates)
+
 
     # Filter the DataFrame based on the x_axis_columns values
     filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
+    # print("filtered_df:-------****---------", filtered_df)
     
     # Perform aggregation based on the selected aggregation type
     if aggregation == "sum":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
-        print("grouped_df---------------sum:", grouped_df)
+        # print("grouped_df---------------sum:", grouped_df)
     elif aggregation == "average":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
-        print("grouped_df---------------average:", grouped_df)
+        # print("grouped_df---------------average:", grouped_df)
     elif aggregation == "count":
         # Check initial data
         print("Filtered DataFrame shape:", filtered_df.shape)
@@ -642,12 +654,48 @@ def fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_colum
     return rows
 
 
-def fetch_column_name(table_name, x_axis_columns,db_nameeee):
+# def fetch_column_name(table_name, x_axis_columns,db_nameeee):
+#     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
+#     cur = conn.cursor()
+#     # for i in range(len(x_axis_columns)):
+#     query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
+#     cur.execute(query)
+#     rows = cur.fetchall()
+#     cur.close()
+#     conn.close()
+#     return rows
+
+from psycopg2 import sql
+
+def fetch_column_name(table_name, x_axis_columns, db_nameeee):
     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     cur = conn.cursor()
-    # for i in range(len(x_axis_columns)):
-    query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}" 
-    cur.execute(query)
+
+    # Check the column data type
+    type_query = sql.SQL(
+        "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
+    )
+    type_check_query = type_query.format(
+        table=sql.Literal(table_name),
+        col=sql.Literal(x_axis_columns)
+    )
+    cur.execute(type_check_query)
+    column_type = cur.fetchone()
+
+    # Dynamically build the query based on the column type
+    if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
+        # Use TO_CHAR for date or timestamp columns
+        query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
+    else:
+        # Directly fetch the column value for other data types
+        query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
+    
+    formatted_query = query.format(
+        col=sql.Identifier(x_axis_columns),
+        table=sql.Identifier(table_name)
+    )
+    
+    cur.execute(formatted_query)
     rows = cur.fetchall()
     cur.close()
     conn.close()
