@@ -18,7 +18,7 @@ from audio import allowed_file,transcribe_audio_with_timestamps,save_file_to_db
 from histogram_utils import generate_histogram_details,handle_column_data_types
 from json_upload import upload_json_to_postgresql
 from config import  ALLOWED_EXTENSIONS,DB_NAME,USER_NAME,PASSWORD,HOST,PORT
-
+from ai_charts import analyze_data
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -178,8 +178,10 @@ def get_table_names():
 def get_columns(table_name):
     db_name= request.args.get('databaseName')
     connectionType= request.args.get('connectionType')
+    selectedUser=request.args.get('selectedUser')
+
     print("connectionType",connectionType)
-    column_names = get_column_names(db_name, username, password, table_name, host, port,connectionType)
+    column_names = get_column_names(db_name, username, password, table_name,selectedUser, host, port,connectionType)
     print("column_names====================",column_names)
     return jsonify(column_names)
 
@@ -1154,12 +1156,53 @@ def receive_chart_data():
     databaseName = data.get('text_y_database')
     table_Name = data.get('text_y_table')[0]
     aggregate=data.get('text_y_aggregate')
+    selectedUser=data.get("selectedUser")
     print("x_axis====================",x_axis)  
     print("databaseName====================",databaseName)  
     print("table_Name====================",table_Name)
     print("aggregate====================",aggregate)
+    print("selectedUser====================",selectedUser)
+    
+    fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate,selectedUser)
+    print("Fetched Data:", fetched_data)
+    print(f"Received x_axis: {x_axis}")
+    print(f"Received databaseName: {databaseName}")
+    print(f"Received table_Name: {table_Name}")
+    print(f"aggregate====================",{aggregate})
 
-    fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate)
+    return jsonify({"data": fetched_data,
+                    "chart_id": chart_id,
+                     "message": "Data received successfully!"})
+
+@app.route('/api/text_chart_view', methods=['POST'])
+def receive_view_chart_data():
+    data = request.get_json()
+    print("data====================",data)
+    chart_id=data.get('chart_id')
+    x_axis = data.get('text_y_xis')[0]
+    databaseName = data.get('text_y_database')
+    table_Name = data.get('text_y_table')[0]
+    aggregate=data.get('text_y_aggregate')
+    
+    print("x_axis====================",x_axis)  
+    print("databaseName====================",databaseName)  
+    print("table_Name====================",table_Name)
+    print("aggregate====================",aggregate)
+    connection =get_db_connection()
+        
+        # Fetch selectedUser from the database based on chart_id
+    query = "SELECT selectedUser FROM new_dashboard_details_new WHERE id = %s"
+    cursor = connection.cursor()
+    cursor.execute(query, (chart_id,))  # Ensure chart_id is passed as a tuple
+    selectedUser = cursor.fetchone()
+    print("selectedUser",selectedUser)
+    if not selectedUser:
+            print("No selectedUser found for chart_id:", chart_id)
+            return {"error": "No user found for the given chart ID"}
+        
+    selectedUser = selectedUser[0]  # Extract value from tuple
+    print("Fetched selectedUser:", selectedUser)
+    fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate,selectedUser)
     print("Fetched Data:", fetched_data)
     print(f"Received x_axis: {x_axis}")
     print(f"Received databaseName: {databaseName}")
@@ -1200,6 +1243,7 @@ def handle_clicked_category():
             chart_type = chart.get('chart_type')
             filter_options = chart.get('filter_options')
             database_name = chart.get('databaseName')
+            
             if isinstance(x_axis, list):
                 x_axis = ', '.join(x_axis)
             
@@ -1216,7 +1260,7 @@ def handle_clicked_category():
             }])
            
             print("x_axis====================",x_axis)
-            chart_data = filter_chart_data(database_name, table_name, x_axis, y_axis, aggregate,clicked_catagory_Xaxis,category)
+            chart_data = filter_chart_data(database_name, table_name, x_axis, y_axis, aggregate,clicked_catagory_Xaxis,category,chart_id)
             chart_data_list.append({
                 "chart_id": chart_id,
                 "data": chart_data
@@ -1548,6 +1592,7 @@ def dashboard_data(dashboard_name):
         chart_ids = data[4]
         print("chart_ids====================",chart_ids)    
         chart_datas=get_dashboard_view_chart_data(chart_ids)
+        print("dashboarddata",chart_datas)
         # print("chart_datas====================",chart_datas)
         # return jsonify(data,chart_datas)
         return jsonify({
@@ -3055,6 +3100,14 @@ def wordcloud_data():
         print(f"Error occurred: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+
+
+@app.route('/ai_ml_chartdata', methods=['GET'])
+def ai_ml_charts():
+    dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
+    ai_ml_charts_details = analyze_data(dataframe)
+    print("ai_ml_charts_details====================", ai_ml_charts_details)
+    return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
 if __name__ == "__main__":
     app.run(debug=True)
    

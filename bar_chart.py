@@ -195,7 +195,7 @@ def remove_symbols(value):
 #         print("Error: Unable to connect to the database.")
 #         print(e)
 #         return {'numeric_columns': [], 'text_columns': []}
-def get_column_names(db_name, username, password, table_name, host='localhost', port='5432', connection_type='local', company_name=None):
+def get_column_names(db_name, username, password, table_name,selectedUser, host='localhost', port='5432', connection_type='local'):
     global global_df
     oldtablename = getattr(get_column_names, 'oldtablename', None)
     print('connectontype',connection_type)
@@ -240,7 +240,7 @@ def get_column_names(db_name, username, password, table_name, host='localhost', 
                 port=port
             )
         else:  # External database connection
-            connection_details = fetch_external_db_connection(db_name)
+            connection_details = fetch_external_db_connection(db_name,selectedUser)
             if connection_details:
                 db_details = {
                     "host": connection_details[3],
@@ -315,9 +315,10 @@ def get_column_names(db_name, username, password, table_name, host='localhost', 
         print(e)
         return {'numeric_columns': [], 'text_columns': []}
 
-def fetch_external_db_connection(db_name):
+def fetch_external_db_connection(db_name,selectedUser):
     try:
         print("company_name", db_name)
+        print("selectedUser",selectedUser)
         # Connect to local PostgreSQL to get external database connection details
         conn = psycopg2.connect(
             dbname=db_name,  # Ensure this is the correct company database
@@ -328,7 +329,15 @@ def fetch_external_db_connection(db_name):
         )
         print("conn", conn)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM external_db_connections ORDER BY created_at DESC LIMIT 1;")
+        query = """
+            SELECT * 
+            FROM external_db_connections 
+            WHERE savename = %s 
+            ORDER BY created_at DESC 
+            LIMIT 1;
+        """
+        print("query",query)
+        cursor.execute(query, (selectedUser,))
         connection_details = cursor.fetchone()
         print('connection',connection_details)
         conn.close()
@@ -397,7 +406,7 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
                 conn = psycopg2.connect(connection_string)
             else:
                 print(f"Using connection for user: {selectedUser}")
-                connection_string = fetch_external_db_connection(db_name)
+                connection_string = fetch_external_db_connection(db_name,selectedUser)
                 if not connection_string:
                     raise Exception("Unable to fetch external database connection details.")
 
@@ -609,7 +618,7 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
                 connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
                 connection = psycopg2.connect(connection_string)
         else:  # External connection
-                connection_details = fetch_external_db_connection(db_name)
+                connection_details = fetch_external_db_connection(db_name,selectedUser)
                 if connection_details:
                     db_details = {
                         "host": connection_details[3],
@@ -729,7 +738,7 @@ def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column
                 connection_string = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
                 conn = psycopg2.connect(connection_string)
     else:  # External connection
-        connection_details = fetch_external_db_connection(db_nameeee)
+        connection_details = fetch_external_db_connection(db_nameeee,selectedUser)
         if connection_details:
             db_details = {
                 "host": connection_details[3],
@@ -778,6 +787,8 @@ def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column
     cur.close()
     conn.close()
     return rows
+
+from psycopg2 import sql
 def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
     print("connection_type:", selectedUser)
     
@@ -785,7 +796,7 @@ def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
     if selectedUser == 'null':
         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
     else:  # External connection
-        connection_details = fetch_external_db_connection(db_name)
+        connection_details = fetch_external_db_connection(db_name,selectedUser)
         if connection_details:
             db_details = {
                 "host": connection_details[3],
@@ -806,14 +817,41 @@ def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
         )
     
     cur = conn.cursor()
+    type_query = sql.SQL(
+        "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
+    )
+    type_check_query = type_query.format(
+        table=sql.Literal(table_name),
+        col=sql.Literal(x_axis_columns)
+    )
+    cur.execute(type_check_query)
+    column_type = cur.fetchone()
 
-    query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}"
-    print("querty",query)
-    cur.execute(query)
+    # Dynamically build the query based on the column type
+    if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
+        # Use TO_CHAR for date or timestamp columns
+        query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
+    else:
+        # Directly fetch the column value for other data types
+        query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
+    
+    formatted_query = query.format(
+        col=sql.Identifier(x_axis_columns),
+        table=sql.Identifier(table_name)
+    )
+    
+    cur.execute(formatted_query)
     rows = cur.fetchall()
     cur.close()
     conn.close()
     return rows
+    # query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}"
+    # print("querty",query)
+    # cur.execute(query)
+    # rows = cur.fetchall()
+    # cur.close()
+    # conn.close()
+    # return rows
 
 # def fetch_column_name(table_name, x_axis_columns,db_nameeee):
 #     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
@@ -930,10 +968,14 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py,selectedUser):
     # # Connect to the database
     # conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
     # cur = conn.cursor()
-    if selectedUser == None:
+    # if selectedUser == None:
+    if selectedUser in (None, 'null', '(None,)'):
+    # Handle local database connection
+
         conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
+
     else:  # External connection
-        connection_details = fetch_external_db_connection(databaseName)
+        connection_details = fetch_external_db_connection(databaseName,selectedUser)
         if connection_details:
             db_details = {
                 "host": connection_details[3],
@@ -967,7 +1009,7 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py,selectedUser):
     # Use DISTINCT only if the column type is character varying
     if column_type == 'character varying':
         query = f"""
-        SELECT {aggregate_py}(DISTINCT {x_axis}) AS total_{x_axis}
+        SELECT COUNT(DISTINCT {x_axis}) AS total_{x_axis}
         FROM {table_Name}
         """
         print("character varying")  
@@ -1067,7 +1109,7 @@ def fetch_hierarchical_data(table_name, db_name,selectedUser):
             if selectedUser == 'null':
                 conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
             else:  # External connection
-                connection_details = fetch_external_db_connection(db_name)
+                connection_details = fetch_external_db_connection(db_name,selectedUser)
                 if connection_details:
                     db_details = {
                         "host": connection_details[3],

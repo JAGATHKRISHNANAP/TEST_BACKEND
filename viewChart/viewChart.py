@@ -4,7 +4,8 @@ from psycopg2 import sql
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from config import USER_NAME, DB_NAME, PASSWORD, HOST, PORT
-
+from bar_chart import fetch_external_db_connection
+from user_upload import get_db_connection
 # def get_db_connection_view(database_name):
 #     connection = psycopg2.connect(
 #         dbname=database_name,  # Connect to the specified database
@@ -42,7 +43,7 @@ def fetch_chart_data(connection, tableName):
 
         # Fetch the column names from the cursor
         column_names = [desc[0] for desc in cursor.description]
-
+        print("colum",column_names)
         # Convert the results to a DataFrame with the column names
         df = pd.DataFrame(results, columns=column_names)
 
@@ -187,20 +188,73 @@ def fetch_AI_chart_data(connection, tableName):
 
 
 
-def filter_chart_data(database_name, table_name, x_axis, y_axis, aggregate, clicked_category_Xaxis, category):
+def filter_chart_data(database_name, table_name, x_axis, y_axis, aggregate, clicked_category_Xaxis, category,chart_id):
     try:
         # Connect to the PostgreSQL database
-        connection = psycopg2.connect(
-            dbname=database_name,
-            # user='postgres',
-            # password='jaTHU@12',
-            # host='localhost',
-            # port='5432'
-            user=USER_NAME,
-            password=PASSWORD,
-            host=HOST,
-            port=PORT
-        )
+        # connection = psycopg2.connect(
+        #     dbname=database_name,
+        #     # user='postgres',
+        #     # password='jaTHU@12',
+        #     # host='localhost',
+        #     # port='5432'
+        #     user=USER_NAME,
+        #     password=PASSWORD,
+        #     host=HOST,
+        #     port=PORT
+        # )
+        connection =get_db_connection()
+        
+        # Fetch selectedUser from the database based on chart_id
+        query = f"SELECT selectedUser FROM new_dashboard_details_new WHERE id = %s"
+        cursor = connection.cursor()
+        cursor.execute(query, (chart_id,))
+        selectedUser = cursor.fetchone()
+        print("selectedUser",selectedUser)
+        # connection = get_db_connection_view(databaseName)
+        # df = fetch_chart_data(connection, tableName)
+        if selectedUser is None:
+            print("No selectedUser found for this chart_id.")
+            connection = get_db_connection_view(database_name)
+        else:
+            selectedUser = selectedUser[0]  # Extract the actual value from the tuple
+            print("Fetched selectedUser:", selectedUser)
+
+
+            # savename=data.get('selectedUser')
+            # print("savename",savename)
+            # connection = fetch_external_db_connection(company_name,savename)  # Custom logic for 'external' connection type
+            # host = connection[3]
+            # dbname = connection[7]
+            # user = connection[4]
+            # password = connection[5]
+            
+            # # Create a new psycopg2 connection using the details from the tuple
+            # connection = psycopg2.connect(
+            #     dbname=dbname,
+            #     user=user,
+            #     password=password,
+            #     host=host
+            # )
+            # print('External Connection established:', connection)
+        
+            if selectedUser:
+                connection = fetch_external_db_connection(database_name, selectedUser)
+                host = connection[3]
+                dbname = connection[7]
+                user = connection[4]
+                password = connection[5]
+
+                # Create a new psycopg2 connection using the details from the tuple
+                connection = psycopg2.connect(
+                    dbname=dbname,
+                    user=user,
+                    password=password,
+                    host=host
+                )
+                print('External Connection established:', connection)
+            else:
+                print("No valid selectedUser found.")
+                connection = get_db_connection_view(database_name)
         cursor = connection.cursor(cursor_factory=RealDictCursor)
 
         X_Axis = x_axis

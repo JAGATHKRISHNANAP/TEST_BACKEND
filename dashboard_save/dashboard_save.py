@@ -239,7 +239,7 @@ def get_dashboard_view_chart_data(chart_ids):
                 chart_ids = ast.literal_eval(chart_ids)  # Convert string representation of list to actual list
 
             chart_data_list = []
-
+            print("chart_data_list",chart_data_list)
             for chart_id in chart_ids:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, database_name, selected_table, x_axis, y_axis, aggregate, chart_type, filter_options, chart_heading, chart_color, selectedUser FROM new_dashboard_details_new WHERE id = %s", (chart_id,))
@@ -290,10 +290,55 @@ def get_dashboard_view_chart_data(chart_ids):
                             host=host
                         )
                         print('External Connection established:', connection)
+                    if chart_type == "wordCloud":
+                        if len(y_axis) == 0:
+                            x_axis_columns_str = ', '.join(x_axis)
+                            print("x_axis_columns_str:", x_axis_columns_str)
+                            query = f"""
+                                SELECT word, COUNT(*) AS word_count
+                                FROM (
+                                    SELECT regexp_split_to_table({x_axis_columns_str}, '\\s+') AS word
+                                    FROM {table_name}
+                                ) AS words
+                                GROUP BY word
+                                ORDER BY word_count DESC;
+                            """
+                            print("WordCloud SQL Query:", query)
+
+                            try:
+                                cursor = connection.cursor()
+                                cursor.execute(query)
+                                data = cursor.fetchall()
+                                cursor.close()
+                                print("wordcloulddata",data)
+                                if data:
+                                    categories = [row[0] for row in data]  # Words
+                                    values = [row[1] for row in data]     # Counts
+
+                                    chart_data_list.append({
+                                        "chart_id": chart_id,
+                                        "categories": categories,
+                                        "values": values,
+                                        "chart_type": chart_type,
+                                        "chart_heading": chart_heading,
+                                    })
+                                    continue
+                                else:
+                                    print("No data returned for WordCloud query")
+                            except Exception as e:
+                                print("Error executing WordCloud query:", e)
+                                chart_data_list.append({
+                                    "error": f"WordCloud query failed: {str(e)}"
+                                })
+                    
+                    
+    # Fetch single aggregated value based on user
 
                     # Handle singleValueChart type separately
-                    if chart_type == "singleValueChart":
-                        single_value_result = fetchText_data(database_name, table_name, x_axis[0], aggregate)
+                    elif chart_type == "singleValueChart":
+                        print("sv")
+                        single_value_result = fetchText_data(database_name, table_name, x_axis[0], aggregate,selected_user)
+                        
                         print("Single Value Result for Chart ID", chart_id, ":", single_value_result)
 
                         # Append single value chart data
@@ -360,7 +405,7 @@ def get_dashboard_view_chart_data(chart_ids):
                         continue  # Skip further processing for this chart ID
 
                     # Handle dual y_axis columns
-                    if len(y_axis) == 2:
+                    elif len(y_axis) == 2:
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
                         print("Grouped DataFrame (dual y-axis):", grouped_df.head())
 
@@ -392,6 +437,25 @@ def get_dashboard_view_chart_data(chart_ids):
                             "y_axis": y_axis,
                             "aggregate": aggregate
                         })
+                    if chart_type == "treeHierarchy":
+                        # No grouping or transformation needed for this chart type
+                        filtered_categories = []
+                        filtered_values = []
+                        print("No grouping or conversion for treeHierarchy chart type.")
+                        
+                        connection.close()  # Ensure DB connection is closed
+                        dataframe_dict = df.to_dict(orient='records')  # Convert DataFrame to JSON
+                        print("df_json====================", dataframe_dict)
+
+                        return jsonify({
+                            "message": "Chart details received successfully!",
+                            "categories": filtered_categories,
+                            "values": filtered_values,
+                            "chart_type": chart_type,
+                            "chart_heading": chart_heading,
+                            "x_axis": x_axis,
+                            "data_frame": dataframe_dict,
+                        }), 200
 
                     else:
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
