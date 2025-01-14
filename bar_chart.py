@@ -728,7 +728,7 @@ def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):
 
 
 
-def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column,aggregation,db_nameeee,selectedUser):
+def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_columns,aggregation,db_nameeee,selectedUser):
     # conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     # cur = conn.cursor()
     # if selectedUser == 'null':
@@ -775,11 +775,12 @@ def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column
     placeholders = ','.join(['%s' for _ in options])
     # query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
     # Ensure there are at least two columns for y_axis_columns, or handle it appropriately
-    if len(y_axis_column) == 1:
-        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
+    if len(y_axis_columns) == 1:
+        print("y=1")
+        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
     
     else:
-        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]}, {aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
+        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]}, {aggregation}(\"{y_axis_columns[1]}\"::numeric) AS {y_axis_columns[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
 
     print("Constructed Query:", cur.mogrify(query, options).decode('utf-8'))
     cur.execute(query,options)

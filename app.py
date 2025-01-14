@@ -2373,56 +2373,6 @@ def create_connection( db_name="datasource",
     except psycopg2.Error as e:
         return str(e)
 
-# @app.route('/connect', methods=['POST'])
-# def connect_and_create_table():
-#     data = request.json
-#     username = data.get('username')
-#     password = data.get('password')
-#     host = data.get('host', 'localhost')
-#     port = data.get('port', '5432')
-#     db_name = data.get('dbName')
-
-#     try:
-#         # Connect to the default PostgreSQL database to create a new database
-#         default_conn = psycopg2.connect(
-#             user=username, password=password, host=host, port=port
-#         )
-#         default_conn.autocommit = True
-#         default_cursor = default_conn.cursor()
-
-#         # Create the target database if it doesn't exist
-#         default_cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
-#         default_conn.close()
-
-#         # Get a connection to the newly created company-specific database
-#         conn = get_company_db_connection(db_name)
-#         cursor = conn.cursor()
-
-#         # Create the table in the company-specific database
-#         cursor.execute("""
-#             CREATE TABLE IF NOT EXISTS company_data (
-#                 id SERIAL PRIMARY KEY,
-#                 company_name VARCHAR(255) NOT NULL,
-#                 client_name VARCHAR(255) NOT NULL,
-#                 database_type VARCHAR(50) NOT NULL
-#             );
-#         """)
-
-#         conn.commit()
-
-#         # Fetch table names from the company-specific database to verify
-#         cursor.execute("""
-#             SELECT table_name FROM information_schema.tables
-#             WHERE table_schema = 'public';
-#         """)
-#         tables = [row[0] for row in cursor.fetchall()]
-
-#         conn.close()
-
-#         return jsonify(success=True, tables=tables)
-#     except Exception as e:
-#         return jsonify(success=False, error=str(e))
-
 
 @app.route('/save_connection', methods=['POST'])
 def save_connection():
@@ -2490,35 +2440,6 @@ def get_Edb_connection(username, password, host, port, db_name):
     except Exception as e:
         raise Exception(f"Unable to connect to the database: {str(e)}")
 
-# @app.route('/connect', methods=['POST'])
-# def connect_and_fetch_tables():
-#     data = request.json
-#     username = data.get('username')
-#     password = data.get('password')
-#     host = data.get('host', 'localhost')  # Default to localhost if not provided
-#     port = data.get('port', '5432')  # Default PostgreSQL port
-#     db_name = data.get('dbName')
-
-#     try:
-#         # Connect to the external database using the provided credentials
-#         conn = get_Edb_connection(username, password, host, port, db_name)
-#         cursor = conn.cursor()
-
-#         # Query to fetch all tables in the 'public' schema
-#         cursor.execute("""
-#             SELECT table_name 
-#             FROM information_schema.tables 
-#             WHERE table_schema = 'public';
-#         """)
-
-#         # Get the list of tables
-#         tables = [row[0] for row in cursor.fetchall()]
-
-#         conn.close()
-
-#         return jsonify(success=True, tables=tables)
-#     except Exception as e:
-#         return jsonify(success=False, error=str(e))
 from pymongo import MongoClient
 import mysql.connector
 import cx_Oracle
@@ -3108,6 +3029,111 @@ def ai_ml_charts():
     ai_ml_charts_details = analyze_data(dataframe)
     print("ai_ml_charts_details====================", ai_ml_charts_details)
     return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
+
+
+@app.route('/boxplot-data', methods=['POST'])
+def boxplot_data():
+    try:
+        data = request.json
+        db_name = data.get("databaseName", "")  # Moved assignment here
+        selectedUser=data.get("selectedUser")
+        table_name=data.get("tableName")
+        if not db_name:
+            return jsonify({"error": "Database name is missing"}), 400
+        if not selectedUser or selectedUser.lower() == 'null':
+                print("Using default database connection...")
+                connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
+                connection = psycopg2.connect(connection_string)
+        else:  # External connection
+                connection_details = fetch_external_db_connection(db_name,selectedUser)
+                if connection_details:
+                    db_details = {
+                        "host": connection_details[3],
+                        "database": connection_details[7],
+                        "user": connection_details[4],
+                        "password": connection_details[5],
+                        "port": int(connection_details[6])
+                    }
+                if not connection_details:
+                    raise Exception("Unable to fetch external database connection details.")
+                
+                connection = psycopg2.connect(
+                    dbname=db_details['database'],
+                    user=db_details['user'],
+                    password=db_details['password'],
+                    host=db_details['host'],
+                    port=db_details['port'],
+                )
+        cur = connection.cursor()
+        # # Now `db_name` is defined and can be used in the connection string
+        # conn = psycopg2.connect(f"dbname={db_name} user=postgres password=Gayu@123 host=localhost")
+        # cur = conn.cursor()
+        filterOptions=data.get("filterOptions")
+        category = data.get("category", [])  # Expected to be a list
+        yAxis = data.get("yAxis", [""])[0]  # Assuming this is a single string
+        table_name = data.get("tableName", "")
+
+        if not category or not yAxis or not table_name:
+            return jsonify({"error": "Missing required parameters"}), 400
+
+        category_columns = ', '.join(category)
+        print(f"Category columns: {category_columns}")
+        print(f"yAxis: {yAxis}")
+        print(f"table_name: {table_name}")
+
+        query = f"""
+        SELECT 
+            {category_columns},  
+            MIN({yAxis}) AS min_value,
+            percentile_cont(0.25) WITHIN GROUP (ORDER BY {yAxis}) AS Q1,
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY {yAxis}) AS median,
+            percentile_cont(0.75) WITHIN GROUP (ORDER BY {yAxis}) AS Q3,
+            MAX({yAxis}) AS max_value
+        FROM {table_name}
+        WHERE {filterOptions}
+        GROUP BY {category_columns};
+        """
+
+        print("Executing query:", query)
+        cur.execute(query)
+        results = cur.fetchall()
+
+        if not results:
+            print("No results returned from the database query.")
+            return jsonify({"error": "No data available."}), 404
+
+        print("Results fetched from database:", results)
+
+        # Create DataFrame
+        df = pd.DataFrame(results, columns=[*category, "min", "Q1", "median", "Q3", "max"])
+        if df.empty:
+            print("DataFrame is empty after creation.")
+            return jsonify({"error": "No data available to display."}), 404
+
+        # Prepare the response data
+        response_data = [
+            {
+                "category": {col: row[i] for i, col in enumerate(category)},
+                "min": row[len(category)],
+                "Q1": row[len(category) + 1],
+                "median": row[len(category) + 2],
+                "Q3": row[len(category) + 3],
+                "max": row[len(category) + 4]
+            }
+            for row in results
+        ]
+        
+
+        cur.close()
+        connection.close()
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+
 if __name__ == "__main__":
     app.run(debug=True)
    
