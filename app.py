@@ -198,6 +198,79 @@ def ai_ml_charts():
     print("ai_ml_charts_details====================", ai_ml_charts_details)
     return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
 
+
+# @app.route('/ai_ml_filter_chartdata', methods=['GET'])
+# def ai_ml_filter_chart_data():
+#     dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
+#     filtered_dataframe = dataframe[dataframe['region'] == 'Asia']
+#     print("filtered_dataframe====================", filtered_dataframe)
+#     ai_ml_charts_details = analyze_data(filtered_dataframe)
+#     print("ai_ml_charts_details====================", ai_ml_charts_details)
+#     return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
+
+# @app.route('/ai_ml_filter_chartdata', methods=['GET'])
+# def ai_ml_filter_chart_data():
+#     # Get query parameters from the request
+#     x_axis = request.args.get('x_axis')
+#     category = request.args.get('category')
+
+#     if not x_axis or not category:
+#         return jsonify({"error": "Region and value are required"}), 400
+
+#     # Filter the DataFrame based on the query parameters
+#     dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
+#     filtered_dataframe = dataframe[dataframe[x_axis] == category]
+    
+#     print("Filtered DataFrame:", filtered_dataframe)
+#     ai_ml_charts_details = analyze_data(filtered_dataframe)
+#     print("AI/ML Charts Details:", ai_ml_charts_details)
+
+#     return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
+
+
+
+
+
+# from flask import request, jsonify
+
+@app.route('/ai_ml_filter_chartdata', methods=['POST'])
+def ai_ml_filter_chart_data():
+    try:
+        # Extract data from the POST request
+        data = request.get_json()
+        if not data or 'category' not in data or 'x_axis' not in data:
+            return jsonify({"error": "category and x_axis are required"}), 400
+
+        category = data['category']  # Value to filter by
+        x_axis = data['x_axis']      # Region column name
+
+        # Filter the DataFrame dynamically based on x_axis and category
+        dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
+        filtered_dataframe = dataframe[dataframe[x_axis] == category]
+
+        print("Filtered DataFrame:", filtered_dataframe)
+        ai_ml_charts_details = analyze_data(filtered_dataframe)
+        print("AI/ML Charts Details:", ai_ml_charts_details)
+
+        return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @app.route('/join-tables', methods=['POST'])
 def join_tables():
     data = request.json
@@ -267,6 +340,83 @@ def get_table_data():
         return jsonify({'error':str(e)}),500
 
 
+# @app.route('/plot_chart', methods=['POST', 'GET'])
+# def get_bar_chart_route():
+#     df = bc.global_df
+#     df_json = df.to_json(orient='split')  # Convert the DataFrame to JSON
+#     data = request.json
+
+#     table_name = data['selectedTable']
+#     x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
+#     y_axis_columns = data['yAxis']  # Assuming yAxis can be multiple columns as well
+#     aggregation = data['aggregate']
+#     checked_option = data['filterOptions']
+#     db_nameeee = data['databaseName']
+#     print("y_axis_columns====================", y_axis_columns)
+#     print("db_nameeee====================", db_nameeee)
+#     print("data====================", data)
+#     try:
+#         df[y_axis_columns[0]] = pd.to_datetime(df[y_axis_columns[0]], format='%H:%M:%S', errors='raise')
+
+#         # If successful, convert time format to minutes
+#         df[y_axis_columns[0]] = df[y_axis_columns[0]].apply(lambda x: x.hour * 60 + x.minute)
+#         print(f"{y_axis_columns[0]} converted to minutes.")
+#     except ValueError:
+#         # If conversion fails, it is not in time format
+#         print(f"{y_axis_columns[0]} is not in time format. No conversion applied.")
+
+#     if len(y_axis_columns) == 1:
+#         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+#         print("Data for single y-axis column:------------------------------------------------------------------------", data)
+        
+#         if aggregation == "count":
+#             print("Data for count aggregation:", data)
+#             array1 = [item[0] for item in data]
+#             array2 = [item[1] for item in data]
+#             print("Array1:", array1)
+#             print("Array2:", array2)
+            
+#             # Return the JSON response for count aggregation
+#             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
+#         elif aggregation == "average":
+#             array1 = [item[0] for item in data]
+#             array2 = [item[1] for item in data]
+#             print("Array1:", array1)
+#             print("Array2:", array2)
+#             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
+        
+#         # For other aggregation types
+#         categories = {}
+#         for row in data:
+#             category = tuple(row[:-1])
+#             y_axis_value = row[-1]
+#             if category not in categories:
+#                 categories[category] = initial_value(aggregation)
+#             update_category(categories, category, y_axis_value, aggregation)
+
+#         labels = [', '.join(category) for category in categories.keys()]
+#         values = list(categories.values())
+#         print("labels====================", labels)
+#         print("values====================", values)
+        
+#         # Return the JSON response for other aggregations
+#         return jsonify({"categories": labels, "values": values, "aggregation": aggregation, "dataframe": df_json})
+
+
+#     elif len(y_axis_columns) == 2:
+#         datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        
+#         data = {
+#             "categories": [row[0] for row in datass],
+#             "series1": [row[1] for row in datass],
+#             "series2": [row[2] for row in datass],
+#             "dataframe": df_json
+#         }
+        
+#         return jsonify(data)
+
+
+
 @app.route('/plot_chart', methods=['POST', 'GET'])
 def get_bar_chart_route():
     df = bc.global_df
@@ -279,9 +429,65 @@ def get_bar_chart_route():
     aggregation = data['aggregate']
     checked_option = data['filterOptions']
     db_nameeee = data['databaseName']
+    # selectedUser=data['selectedUser']
+    chart_data=data['chartType']
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
+    if len(y_axis_columns) == 0 and chart_data == "wordCloud": 
+        # Handle WordCloud scenario
+        
+        query = f"""
+            SELECT word, COUNT(*) AS word_count
+            FROM (
+                SELECT regexp_split_to_table('{checked_option}', '\\s+') AS word
+                FROM {table_name}
+            ) AS words
+            GROUP BY word
+            ORDER BY word_count DESC;
+        """
+        print("WordCloud SQL Query:", query)
+        
+        try:
+            print("Using default database connection...")
+            connection_string = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+            connection = psycopg2.connect(connection_string)
+           
+            cursor = connection.cursor()
+            cursor.execute(query)
+            data = cursor.fetchall()
+            
+            categories = [row[0] for row in data]  # Words
+            values = [row[1] for row in data]     # Counts
+            
+            # return jsonify({
+            #     "categories": categories,
+            #     "values": values,
+            #     "chartType": "wordCloud",
+            #     "dataframe": df_json
+            # })
+            data = {
+            "categories" : [row[0] for row in data],  # Words
+            "values" : [row[1] for row in data],     #
+            "dataframe": df_json
+            }
+        
+            return jsonify(data)
+        except Exception as e:
+            print("Error executing WordCloud query:", e)
+            return jsonify({"error": str(e)})
+    
+    if len(x_axis_columns) == 2 and chart_data == "duealbarChart":    # Handle dual X-axis scenario
+            data = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+            
+            # Return categories and series for dual X-axis chart
+            return jsonify({
+                "categories": [row[0] for row in data],  # First X-axis category
+                "series1": [row[1] for row in data],  # Series 1 data
+                "series2": [row[1] for row in data],  # Series 2 data
+                "dataframe": df_json
+            })
+        
     try:
         df[y_axis_columns[0]] = pd.to_datetime(df[y_axis_columns[0]], format='%H:%M:%S', errors='raise')
 
@@ -294,7 +500,6 @@ def get_bar_chart_route():
 
     if len(y_axis_columns) == 1:
         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
-        print("Data for single y-axis column:------------------------------------------------------------------------", data)
         
         if aggregation == "count":
             print("Data for count aggregation:", data)
@@ -304,12 +509,6 @@ def get_bar_chart_route():
             print("Array2:", array2)
             
             # Return the JSON response for count aggregation
-            return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
-        elif aggregation == "average":
-            array1 = [item[0] for item in data]
-            array2 = [item[1] for item in data]
-            print("Array1:", array1)
-            print("Array2:", array2)
             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
         
         # For other aggregation types
@@ -341,6 +540,48 @@ def get_bar_chart_route():
         }
         
         return jsonify(data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def initial_value(aggregation):
     if aggregation in ['sum', 'average']:
@@ -1190,15 +1431,29 @@ def receive_chart_details():
                 chosen_grouped_df = grouped_df_valid
                 categories = chosen_grouped_df[x_axis[0]].tolist()
                 values = chosen_grouped_df["count"].tolist()
+                print("categories====================", categories)
+                print("values====================", values)
+                # filtered_categories = []
+                # filtered_values = []
+                # for category, value in zip(categories, values):
+                #     if category in filter_options:
+                #         filtered_categories.append(category)
+                #         filtered_values.append(value)
+
+                # print("filtered_categories====================3333", filtered_categories)
+                # print("filtered_values====================33333", filtered_values)
+
                 filtered_categories = []
                 filtered_values = []
                 for category, value in zip(categories, values):
                     if category in filter_options:
                         filtered_categories.append(category)
                         filtered_values.append(value)
+                    else:
+                        print(f"Category '{category}' not in filter_options")  # Debugging line
 
-                print("filtered_categories====================", filtered_categories)
-                print("filtered_values====================", filtered_values)
+                print("filtered_categories====================3333", filtered_categories)
+                print("filtered_values====================33333", filtered_values)
 
                 connection.close()
 
@@ -1223,9 +1478,22 @@ def receive_chart_details():
                     grouped_df = df.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
                     print("Grouped DataFrame (dual y-axis): ", grouped_df.head())
 
+                    # categories = grouped_df[x_axis[0]].tolist()
+                    # categories = [category.strftime('%Y-%m-%d') for category in grouped_df[x_axis[0]]]
                     categories = grouped_df[x_axis[0]].tolist()
+
+                    # Check if the elements are datetime objects before formatting
+                    if isinstance(categories[0], pd.Timestamp):  # Assumes at least one value is present
+                        categories = [category.strftime('%Y-%m-%d') for category in categories]
+                    else:
+                        categories = [str(category) for category in categories]  
+
+
+                    
                     values1 = [float(value) for value in grouped_df[y_axis[0]]]  # Convert Decimal to float
                     values2 = [float(value) for value in grouped_df[y_axis[1]]]  # Convert Decimal to float
+
+                    print("duel axis categories====================", categories)   
 
                     # Filter categories and values based on filter_options
                     filtered_categories = []
@@ -1266,8 +1534,17 @@ def receive_chart_details():
 
                     print("Grouped DataFrame: ", grouped_df.head())
 
+
                     categories = grouped_df[x_axis[0]].tolist()
+                    if isinstance(categories[0], pd.Timestamp):  # Assumes at least one value is present
+                        categories = [category.strftime('%Y-%m-%d') for category in categories]
+                    else:
+                        categories = [str(category) for category in categories]  
+
                     values = [float(value) for value in grouped_df[y_axis[0]]]  # Convert Decimal to float
+
+                    print("categories====================22222", categories) 
+                    print("values====================22222", values)
 
                     # Filter categories and values based on filter_options
                     filtered_categories = []
@@ -1277,7 +1554,7 @@ def receive_chart_details():
                             filtered_categories.append(category)
                             filtered_values.append(value)
 
-                    print("filtered_categories====================", filtered_categories)
+                    print("filtered_categories====================1111", filtered_categories)
                     print("filtered_values====================", filtered_values)
 
                     connection.close()
@@ -1367,255 +1644,6 @@ def saved_dashboard_names():
     else:
         return jsonify({'error': 'Failed to fetch chart names'})
 
-
-# @app.route('/api/usersignup', methods=['POST'])
-# def usersignup():
-    data = request.json
-    print("Received Data:", data)
-
-    register_type = data.get("registerType")
-    print("Register Type:", register_type)
-
-    user_details = data.get("userDetails")
-    print("User Details:", user_details)
-
-    if register_type == "manual":
-        # Manual Registration Handling
-        employee_name = user_details.get("employeeName")
-        role_name = user_details.get("roleId")  # This is a role name (e.g., "Developer")
-        organization_name = user_details.get("company")
-        username = user_details.get("userName")
-        email=user_details.get("email")
-        password = user_details.get("password")
-        retype_password = user_details.get("retypePassword")
-        categories = user_details.get("categories", [])  # Extract categories as a list
-
-        if password != retype_password:
-            return jsonify({'message': 'Passwords do not match'}), 400
-
-        # Connect to the signup database first to get the role_id
-        conn_datasource = get_db_connection("datasource")
-        if not conn_datasource:
-            print("Failed to connect to signup database.")
-            return jsonify({'message': 'Failed to connect to signup database'}), 500
-
-        try:
-            # Fetch the role_id based on the role name from the signup database
-            with conn_datasource.cursor() as cursor_datasource:
-                cursor_datasource.execute("""
-                    SELECT role_id FROM role WHERE LOWER(role_name) = LOWER(%s)
-                """, (role_name,))
-                role_data = cursor_datasource.fetchone()
-
-                if not role_data:
-                    print(f"Role not found for role name: {role_name}")
-                    return jsonify({'message': 'Role not found for role name: ' + role_name}), 404
-
-                role_id = role_data[0]  # Get the role_id
-
-        except Exception as e:
-            print(f"Error fetching role_id: {e}")
-            return jsonify({'message': 'Error fetching role_id'}), 500
-
-        # Connect to the respective company's database
-        conn = get_company_db_connection(organization_name)
-        if not conn:
-            print(f"Failed to connect to company database for {organization_name}.")
-            return jsonify({'message': 'Failed to connect to company database'}), 500
-        create_user_table(conn)
-
-        try:
-            with conn.cursor() as cursor:
-                # Check if the username already exists in employee_list
-                cursor.execute("""
-                    SELECT COUNT(*) FROM employee_list WHERE username = %s
-                """, (username,))
-                result = cursor.fetchone()
-
-                if result and result[0] > 0:
-                    return jsonify({'message': 'Username already exists in employee_list'}), 400
-
-                # Encrypt the password
-                hashed_password = encrypt_password(password)
-
-                # Define the action_type and action_by fields
-                action_type = "add"  # New user registration, action type set to 'add'
-                action_by = "admin"  # Set this to the current admin's username or user ID
-
-                # Insert into employee_list table in the company database
-                cursor.execute("""
-                    INSERT INTO employee_list (employee_name, role_id, username,email, password,category, action_type, action_by)
-                    VALUES (%s, %s, %s,%s, %s,%s, %s, %s)
-                """, (employee_name, role_id, username,email, hashed_password, categories,action_type, action_by))
-
-                # Retrieve the generated employee_id
-                cursor.execute("SELECT currval(pg_get_serial_sequence('employee_list', 'employee_id'))")
-                employee_id = cursor.fetchone()[0]
-
-            # Handle category insertion with check for duplicate category under same company
-            if categories:
-                for category in categories:
-                    with conn_datasource.cursor() as cursor_datasource:
-                        # Check if the category already exists for the specific company
-                        cursor_datasource.execute("""
-                            SELECT category_id FROM category 
-                            WHERE LOWER(category_name) = LOWER(%s) 
-                            AND company_id = (SELECT id FROM organizationdatatest WHERE organizationname = %s)
-                        """, (category, organization_name))
-                        
-                        result = cursor_datasource.fetchone()
-                        
-                        if result:
-                            # If the category exists for the same company, raise an error
-                            return jsonify({
-                                'message': f"Category '{category}' already exists for the company '{organization_name}'"
-                            }), 400
-
-                        # Insert the new category if it doesn't exist
-                        cursor_datasource.execute("""
-                            INSERT INTO category (category_name, company_id)
-                            VALUES (%s, (SELECT id FROM organizationdatatest WHERE organizationname = %s))
-                            RETURNING category_id;
-                        """, (category, organization_name))
-                        category_id = cursor_datasource.fetchone()[0]  # Fetch the new category_id
-
-                        # Insert the user into the signup database with the category_id
-                        cursor_datasource.execute("""
-                            INSERT INTO "user" (user_id, role_id, company_id, category_id)
-                            VALUES (%s, %s, (SELECT id FROM organizationdatatest WHERE organizationname = %s), %s)
-                        """, (employee_id, role_id, organization_name, category_id))
-
-            # Commit transactions only after all validation and inserts are successful
-            conn.commit()  
-            conn_datasource.commit()
-
-            return jsonify({'message': 'User and categories created successfully'}), 200
-        except Exception as e:
-            print(f"Error: {e}")
-            return jsonify({'message': 'Error creating user'}), 500
-
-        finally:
-            # Close both database connections
-            conn.close()
-            conn_datasource.close()
-
-    elif register_type == "File_Upload":
-    # File upload handling (similar logic for action_type applies here)
-        conn_datasource = get_db_connection("datasource")
-        if not conn_datasource:
-            return jsonify({'message': 'Failed to connect to datasource database'}), 500
-
-        try:
-            for user in user_details:
-                employee_name = user.get("employeeName")
-                role_name = user.get("roleId")  # This is a role name (e.g., "Developer")
-                organization_name = user.get("company")
-                username = user.get("userName")
-                password = user.get("Password")
-                categories = user.get("category")
-                email = user.get("email")
-                category_list = [category.strip() for category in categories.splitlines()]
-
-                if not employee_name or not role_name or not username or not categories:
-                    return jsonify({'message': f'Missing required details for user: {username}'}), 400
-
-                # Fetch the role_id from the signup database
-                with conn_datasource.cursor() as cursor_datasource:
-                    cursor_datasource.execute("""
-                        SELECT role_id FROM role WHERE LOWER(role_name) = LOWER(%s)
-                    """, (role_name,))
-                    role_data = cursor_datasource.fetchone()
-
-                    if not role_data:
-                        return jsonify({'message': f'Role not found for user: {username}'}), 404
-
-                    role_id = role_data[0]
-
-                # Connect to the company's database
-                conn = connect_db(organization_name)
-                if not conn:
-                    return jsonify({'message': f'Failed to connect to database for company: {organization_name}'}), 500
-
-                try:
-                    with conn.cursor() as cursor:
-                        # Check if the username already exists in employee_list
-                        cursor.execute("""
-                            SELECT COUNT(*) FROM employee_list WHERE username = %s
-                        """, (username,))
-                        result = cursor.fetchone()
-
-                        if result and result[0] > 0:
-                            return jsonify({'message': f'Username already exists for user: {username}'}), 400
-
-                        # Encrypt the password
-                        hashed_password = encrypt_password(password)
-
-                        # Insert into employee_list table
-                        action_type = "add"  # File upload case, action type is 'add'
-                        action_by = "admin"  # Set dynamically based on the user performing the action
-
-                        cursor.execute("""
-                            INSERT INTO employee_list (employee_name, role_id, username,category, email, password, action_type, action_by)
-                            VALUES (%s, %s, %s, %s,%s, %s, %s, %s)
-                        """, (employee_name, role_id, username, categories,email, hashed_password, action_type, action_by))
-
-                        # Retrieve the generated employee_id
-                        cursor.execute("SELECT currval(pg_get_serial_sequence('employee_list', 'employee_id'))")
-                        employee_id = cursor.fetchone()[0]
-
-                    # Handle category insertion for file upload with duplicate check
-                    for category in category_list:
-                        # Open a new cursor for each category
-                        with conn_datasource.cursor() as cursor_datasource:
-                            cursor_datasource.execute("""
-                                SELECT category_id FROM category 
-                                WHERE LOWER(category_name) = LOWER(%s) 
-                                AND company_id = (SELECT id FROM organizationdatatest WHERE organizationname = %s)
-                            """, (category, organization_name))
-                            
-                            result = cursor_datasource.fetchone()
-
-                            if result:
-                                return jsonify({
-                                    'message': f"Category '{category}' already exists for the company '{organization_name}'"
-                                }), 400
-
-                            # Insert new category if not found
-                            cursor_datasource.execute("""
-                                INSERT INTO category (category_name, company_id)
-                                VALUES (%s, (SELECT id FROM organizationdatatest WHERE organizationname = %s))
-                                RETURNING category_id;
-                            """, (category, organization_name))
-                            category_id = cursor_datasource.fetchone()[0]
-
-                        # Insert into the user table in the signup database
-                        with conn_datasource.cursor() as cursor_datasource:  # New cursor for user table insertion
-                            cursor_datasource.execute("""
-                                INSERT INTO "user" (user_id, role_id, company_id, category_id)
-                                VALUES (%s, %s, (SELECT id FROM organizationdatatest WHERE organizationname = %s), %s)
-                            """, (employee_id, role_id, organization_name, category_id))
-
-                    # Commit transactions after all user and category insertions are complete
-                    conn.commit()
-                    conn_datasource.commit()
-
-                except Exception as e:
-                    print(f"Error processing file upload user {username}: {e}")
-                    return jsonify({'message': f'Error processing file upload for user: {username}'}), 500
-
-                finally:
-                    if conn:
-                        conn.close()
-
-        except Exception as e:
-            print(f"Error processing file upload: {e}")
-            return jsonify({'message': 'Error processing file upload'}), 500
-
-        finally:
-            if conn_datasource:
-                conn_datasource.close()
-
-        return jsonify({'message': 'File upload processed successfully'}), 200
 
 
 @app.route('/api/usersignup', methods=['POST'])

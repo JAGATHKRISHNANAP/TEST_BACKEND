@@ -426,70 +426,6 @@ def count_function(table_name, x_axis_columns, checked_option, y_axis_column, ag
 
 
 
-# def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
-#     global global_df
-#     print("table_name:", table_name)
-#     print("x_axis_columns:", x_axis_columns)
-#     print("y_axis_column:", y_axis_column)
-#     print("aggregation:", aggregation)
-
-#     if global_df is None:
-#         print("Fetching data from the database...")
-#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
-#         cur = conn.cursor()
-#         query = f"SELECT * FROM {table_name}"
-#         cur.execute(query)
-#         data = cur.fetchall()
-#         colnames = [desc[0] for desc in cur.description]
-#         cur.close()
-#         conn.close()
-
-#         global_df = pd.DataFrame(data, columns=colnames)
-#         print("*********************************************************************************", global_df)
-
-#     # Create a copy of the necessary data for processing
-#     temp_df = global_df.copy()
-
-#     # Convert the x_axis_columns values to strings in the temporary DataFrame
-#     for col in x_axis_columns:
-#         if col in temp_df.columns:
-#             temp_df[col] = temp_df[col].astype(str)
-
-#     x_axis_columns_str = x_axis_columns
-#     options = [option.strip() for option in checked_option.split(',')]
-
-#     # Convert options to strings for comparison
-#     options = list(map(str, options))
-
-#     # Filter the DataFrame based on the x_axis_columns values
-#     filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
-#     print("filtered_df:", filtered_df)  
-    
-#     # Perform aggregation based on the selected aggregation type
-#     if aggregation == "sum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
-#     elif aggregation == "average":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
-#     elif aggregation == "count":
-#         # Check initial data
-#         print("Filtered DataFrame shape:", filtered_df.shape)
-#         print("Null count in y_axis_column[0]:", filtered_df[y_axis_column[0]].isnull().sum())
-
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0]).size().reset_index(name="count")
-#     elif aggregation == "maximum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].max().reset_index()
-#     elif aggregation == "minimum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].min().reset_index()
-#     else:
-#         raise ValueError(f"Unsupported aggregation type: {aggregation}")
-
-#     # Convert the result to a list of tuples for easy output
-#     result = [tuple(x) for x in grouped_df.to_numpy()]
-#     print("result:", result)
-#     return result
-
-
-
 def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
     global global_df
     print("table_name:", table_name)
@@ -509,6 +445,9 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
         conn.close()
 
         global_df = pd.DataFrame(data, columns=colnames)
+        print("*********************************************************************************", global_df)
+
+    # Create a copy of the necessary data for processing
     temp_df = global_df.copy()
 
     # Convert the x_axis_columns values to strings in the temporary DataFrame
@@ -518,29 +457,19 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
 
     x_axis_columns_str = x_axis_columns
     options = [option.strip() for option in checked_option.split(',')]
-    print("options----------+**********+---------:", options)
+
     # Convert options to strings for comparison
     options = list(map(str, options))
-    print("options----------+++++++---------:", options)
-
-    print("temp_df:", temp_df[x_axis_columns[0]])
-#     formatted_dates = temp_df[x_axis_columns[0]].apply(
-#     lambda date_str: datetime.strptime(date_str, '%Y-%m-%d').strftime('%a, %d %b %Y 00:00:00 GMT')
-# )
-#     print("temp_df------:", formatted_dates)
-
 
     # Filter the DataFrame based on the x_axis_columns values
     filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
-    # print("filtered_df:-------****---------", filtered_df)
+    print("filtered_df:", filtered_df)  
     
     # Perform aggregation based on the selected aggregation type
     if aggregation == "sum":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
-        # print("grouped_df---------------sum:", grouped_df)
     elif aggregation == "average":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
-        # print("grouped_df---------------average:", grouped_df)
     elif aggregation == "count":
         # Check initial data
         print("Filtered DataFrame shape:", filtered_df.shape)
@@ -556,8 +485,79 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
 
     # Convert the result to a list of tuples for easy output
     result = [tuple(x) for x in grouped_df.to_numpy()]
-    # print("result:", result)
+    print("result:", result)
     return result
+
+
+
+# def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
+#     global global_df
+#     print("table_name:", table_name)
+#     print("x_axis_columns:", x_axis_columns)
+#     print("y_axis_column:", y_axis_column)
+#     print("aggregation:", aggregation)
+
+#     if global_df is None:
+#         print("Fetching data from the database...")
+#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+#         cur = conn.cursor()
+#         query = f"SELECT * FROM {table_name}"
+#         cur.execute(query)
+#         data = cur.fetchall()
+#         colnames = [desc[0] for desc in cur.description]
+#         cur.close()
+#         conn.close()
+
+#         global_df = pd.DataFrame(data, columns=colnames)
+#     temp_df = global_df.copy()
+
+#     # Convert the x_axis_columns values to strings in the temporary DataFrame
+#     for col in x_axis_columns:
+#         if col in temp_df.columns:
+#             temp_df[col] = temp_df[col].astype(str)
+
+#     x_axis_columns_str = x_axis_columns
+#     options = [option.strip() for option in checked_option.split(',')]
+#     print("options----------+**********+---------:", options)
+#     # Convert options to strings for comparison
+#     options = list(map(str, options))
+#     print("options----------+++++++---------:", options)
+
+#     print("temp_df:", temp_df[x_axis_columns[0]])
+#     formatted_dates = temp_df[x_axis_columns[0]].apply(
+#     lambda date_str: datetime.strptime(date_str, '%Y-%m-%d').strftime('%a, %d %b %Y 00:00:00 GMT')
+# )
+#     print("temp_df------:", formatted_dates)
+
+
+#     # Filter the DataFrame based on the x_axis_columns values
+#     filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
+#     # print("filtered_df:-------****---------", filtered_df)
+    
+#     # Perform aggregation based on the selected aggregation type
+#     if aggregation == "sum":
+#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
+#         # print("grouped_df---------------sum:", grouped_df)
+#     elif aggregation == "average":
+#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
+#         # print("grouped_df---------------average:", grouped_df)
+#     elif aggregation == "count":
+#         # Check initial data
+#         print("Filtered DataFrame shape:", filtered_df.shape)
+#         print("Null count in y_axis_column[0]:", filtered_df[y_axis_column[0]].isnull().sum())
+
+#         grouped_df = filtered_df.groupby(x_axis_columns_str[0]).size().reset_index(name="count")
+#     elif aggregation == "maximum":
+#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].max().reset_index()
+#     elif aggregation == "minimum":
+#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].min().reset_index()
+#     else:
+#         raise ValueError(f"Unsupported aggregation type: {aggregation}")
+
+#     # Convert the result to a list of tuples for easy output
+#     result = [tuple(x) for x in grouped_df.to_numpy()]
+#     # print("result:", result)
+#     return result
 
 
 
@@ -762,19 +762,42 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py):
     """, (table_Name, x_axis))
     
     column_type = cur.fetchone()[0]
-    
-    # Use DISTINCT only if the column type is character varying
+    print("column_type", column_type)  
+
+
+
     if column_type == 'character varying':
         query = f"""
         SELECT {aggregate_py}(DISTINCT {x_axis}) AS total_{x_axis}
         FROM {table_Name}
         """
         print("character varying")  
+    elif column_type == 'date':
+        query = f"""
+        SELECT {aggregate_py}({x_axis}) AS total_{x_axis}
+        FROM {table_Name}
+        WHERE {x_axis} IS NOT NULL
+        """
+        print("date")
     else:
         query = f"""
         SELECT {aggregate_py}({x_axis}) AS total_{x_axis}
         FROM {table_Name}
         """
+    
+    
+    # # Use DISTINCT only if the column type is character varying
+    # if column_type == 'character varying':
+    #     query = f"""
+    #     SELECT {aggregate_py}(DISTINCT {x_axis}) AS total_{x_axis}
+    #     FROM {table_Name}
+    #     """
+    #     print("character varying")  
+    # else:
+    #     query = f"""
+    #     SELECT {aggregate_py}({x_axis}) AS total_{x_axis}
+    #     FROM {table_Name}
+    #     """
 
     print("Query:", query)
     

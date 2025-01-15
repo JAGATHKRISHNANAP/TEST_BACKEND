@@ -583,8 +583,18 @@ def get_dashboard_view_chart_data(chart_ids):
                         print("grouped_df---------",grouped_df)
                         print("Grouped DataFrame (count):", grouped_df.head())
 
+                        # categories = grouped_df[x_axis[0]].tolist()
                         categories = grouped_df[x_axis[0]].tolist()
+
+                        # Check if the elements are datetime objects before formatting
+                        if isinstance(categories[0], pd.Timestamp):  # Assumes at least one value is present
+                            categories = [category.strftime('%Y-%m-%d') for category in categories]
+                        else:
+                            categories = [str(category) for category in categories]  
                         values = grouped_df["count"].tolist()
+
+                        print("categories--111",categories)
+                        print("values--111",values)
 
                         # Filter categories and values based on filter_options
                         filtered_categories = []
@@ -614,7 +624,14 @@ def get_dashboard_view_chart_data(chart_ids):
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
                         print("Grouped DataFrame (dual y-axis):", grouped_df.head())
 
+                        # categories = grouped_df[x_axis[0]].tolist()
                         categories = grouped_df[x_axis[0]].tolist()
+
+                        # Check if the elements are datetime objects before formatting
+                        if isinstance(categories[0], pd.Timestamp):  # Assumes at least one value is present
+                            categories = [category.strftime('%Y-%m-%d') for category in categories]
+                        else:
+                            categories = [str(category) for category in categories]  
                         values1 = [float(value) for value in grouped_df[y_axis[0]]]
                         values2 = [float(value) for value in grouped_df[y_axis[1]]]
 
@@ -683,9 +700,17 @@ def get_dashboard_view_chart_data(chart_ids):
                         
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
                         print("Grouped DataFrame:", grouped_df.head())
-
                         categories = grouped_df[x_axis[0]].tolist()
+
+                        # Check if the elements are datetime objects before formatting
+                        if isinstance(categories[0], pd.Timestamp):  # Assumes at least one value is present
+                            categories = [category.strftime('%Y-%m-%d') for category in categories]
+                        else:
+                            categories = [str(category) for category in categories]  
                         values = [float(value) for value in grouped_df[y_axis[0]]]
+
+                        print("categories--222",categories)
+                        print("values--222",values)
 
                         # Filter categories and values based on filter_options
                         filtered_categories = []
