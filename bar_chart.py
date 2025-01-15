@@ -681,6 +681,11 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].max().reset_index()
     elif aggregation == "minimum":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].min().reset_index()
+    elif aggregation == "variance":
+        print("Grouped DataFrame for Variance Calculation:")
+        print(filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].var())
+        grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].var().reset_index()
+        print("grouped_df",grouped_df)
     else:
         raise ValueError(f"Unsupported aggregation type: {aggregation}")
 

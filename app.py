@@ -242,6 +242,7 @@ def get_bar_chart_route():
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
+    
     if len(y_axis_columns) == 0 and chart_data == "wordCloud": 
         # Handle WordCloud scenario
         
@@ -341,6 +342,18 @@ def get_bar_chart_route():
             
             # Return the JSON response for count aggregation
             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
+        elif aggregation == "average":
+            array1 = [item[0] for item in data]
+            array2 = [item[1] for item in data]
+            print("Array1:", array1)
+            print("Array2:", array2)
+            return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
+        elif aggregation == "variance":
+            array1 = [item[0] for item in data]
+            array2 = [item[1] for item in data]
+            print("Array1:", array1)
+            print("Array2:", array2)
+            return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
         
         # For other aggregation types
         categories = {}
@@ -397,6 +410,14 @@ def update_category(categories, category_key, y_axis_value, aggregation):
             categories[category_key] = [float(y_axis_value), 1]
     elif aggregation == 'count':
         categories[category_key] += 1
+    elif aggregation == 'variance':
+        if isinstance(categories[category_key], list):
+            categories[category_key][0] += float(y_axis_value)  # Sum of values
+            categories[category_key][1] += float(y_axis_value) ** 2  # Sum of squares
+            categories[category_key][2] += 1  # Count of values
+        else:
+            categories[category_key] = [float(y_axis_value), float(y_axis_value) ** 2, 1]  # Initialize list for sum, sum of squares, and count
+
 
 @app.route('/edit_plot_chart', methods=['POST', 'GET'])
 def get_edit_chart_route():
@@ -1995,6 +2016,7 @@ def handle_hierarchical_bar_click():
         print("X-axis Columns:", x_axis_columns)
 
         try:
+            print(global_df)
             if global_df is None:
                 global_df = fetch_hierarchical_data(table_name, db_name,selectedUser)
                 print("Fetched data:", global_df.head() if global_df is not None else "No data returned")
@@ -2444,7 +2466,7 @@ from pymongo import MongoClient
 import mysql.connector
 import cx_Oracle
 try:
-    cx_Oracle.init_oracle_client(lib_dir="C:\\instantclient-basic-windows.x64-23.6.0.24.10\\instantclient_23_6")  # Update the path for your system
+    cx_Oracle.init_oracle_client(lib_dir="C:\instantclient-basic-windows\instantclient_23_6")  # Update the path for your system
 except cx_Oracle.InterfaceError as e:
     if "already been initialized" in str(e):
         print("Oracle Client library has already been initialized. Skipping re-initialization.")
@@ -3038,6 +3060,8 @@ def boxplot_data():
         db_name = data.get("databaseName", "")  # Moved assignment here
         selectedUser=data.get("selectedUser")
         table_name=data.get("tableName")
+        
+        filterOptions=data.get("filterOptions")
         if not db_name:
             return jsonify({"error": "Database name is missing"}), 400
         if not selectedUser or selectedUser.lower() == 'null':
@@ -3068,7 +3092,6 @@ def boxplot_data():
         # # Now `db_name` is defined and can be used in the connection string
         # conn = psycopg2.connect(f"dbname={db_name} user=postgres password=Gayu@123 host=localhost")
         # cur = conn.cursor()
-        filterOptions=data.get("filterOptions")
         category = data.get("category", [])  # Expected to be a list
         yAxis = data.get("yAxis", [""])[0]  # Assuming this is a single string
         table_name = data.get("tableName", "")
@@ -3080,6 +3103,20 @@ def boxplot_data():
         print(f"Category columns: {category_columns}")
         print(f"yAxis: {yAxis}")
         print(f"table_name: {table_name}")
+        print("data",data)
+        
+#         flat_filter_options = [item[0] for item in ast.literal_eval(filterOptions)]
+
+# # Format the list into a string for SQL
+#         formatted_filter_options = ', '.join(f"'{option}'" for option in flat_filter_options)
+        # Flatten filter options
+        flat_filter_options = [item[0] for item in filterOptions]
+        # Format the list into a string for SQL
+        formatted_filter_options = ', '.join(f"'{option}'" for option in flat_filter_options)
+
+        # Debugging: Verify filter values
+        print(f"Formatted filter options: {formatted_filter_options}")
+
 
         query = f"""
         SELECT 
@@ -3090,7 +3127,7 @@ def boxplot_data():
             percentile_cont(0.75) WITHIN GROUP (ORDER BY {yAxis}) AS Q3,
             MAX({yAxis}) AS max_value
         FROM {table_name}
-        WHERE {filterOptions}
+        where {category_columns} in ({formatted_filter_options})
         GROUP BY {category_columns};
         """
 
@@ -3132,6 +3169,34 @@ def boxplot_data():
         print(f"Error occurred: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+
+
+
+
+@app.route('/api/checkSaveName', methods=['POST'])
+def check_save_name():
+    data = request.get_json()
+    save_name = data.get('saveName')
+
+    if not save_name:
+        return jsonify({'error': 'Save name is required'}), 400
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        # Query to check if saveName exists
+        query = "SELECT COUNT(*) FROM new_dashboard_details_new WHERE chart_name = %s"
+        cursor.execute(query, (save_name,))
+        exists = cursor.fetchone()[0] > 0
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({'exists': exists})
+    except Exception as e:
+        print("Error checking save name:", e)
+        return jsonify({'error': 'Database error'}), 500
 
 
 if __name__ == "__main__":
