@@ -428,6 +428,7 @@ def get_edit_chart_route():
     aggregation = data['aggregate']
     checked_option = data['filterOptions'] 
     db_nameeee = data['databaseName']
+    chartType = data['chartType']
     selectedUser=data['selectedUser']
     print(".......................................",data)
     print(".......................................db_nameeee",db_nameeee)
@@ -451,8 +452,67 @@ def get_edit_chart_route():
         print("labels====================", labels)
         print("values====================", values)
         return jsonify({"categories": labels, "values": values, "aggregation": aggregation})
+    
+    elif len(y_axis_columns) == 0 and chartType == "wordCloud":
+            query = f"""
+                SELECT word, COUNT(*) AS word_count
+                FROM (
+                    SELECT regexp_split_to_table('{checked_option}', '\\s+') AS word
+                    FROM {table_name}
+                ) AS words
+                GROUP BY word
+                ORDER BY word_count DESC;
+            """
+            print("WordCloud SQL Query:", query)
+
+            try:
+                # Database connection
+                if not selectedUser or selectedUser.lower() == 'null':
+                    print("Using default database connection...")
+                    connection_string = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+                    connection = psycopg2.connect(connection_string)
+                else:
+                    print("Using external database connection for user:", selectedUser)
+                    savename = data['selectedUser']
+                    connection_details = fetch_external_db_connection(db_nameeee, savename)
+                    if connection_details:
+                        db_details = {
+                            "host": connection_details[3],
+                            "database": connection_details[7],
+                            "user": connection_details[4],
+                            "password": connection_details[5],
+                            "port": int(connection_details[6])
+                        }
+                        connection = psycopg2.connect(
+                            dbname=db_details['database'],
+                            user=db_details['user'],
+                            password=db_details['password'],
+                            host=db_details['host'],
+                            port=db_details['port'],
+                        )
+                    else:
+                        raise Exception("Unable to fetch external database connection details.")
+                
+                cursor = connection.cursor()
+                cursor.execute(query)
+                data = cursor.fetchall()
+
+                categories = [row[0] for row in data]
+                values = [row[1] for row in data]
+                print("WordCloud Data:", {"categories": categories, "values": values})
+
+                return jsonify({
+                    "categories": categories,
+                    "values": values,
+                    "chartType": "wordCloud"
+                })
+
+            except Exception as e:
+                print("Error executing WordCloud query:", e)
+                return jsonify({"error": str(e)}), 500
+        
     elif len(y_axis_columns) == 2:
-        datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         data = {
             "categories": [row[0] for row in datass],
             "series1": [row[1] for row in datass],
