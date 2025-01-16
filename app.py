@@ -244,13 +244,16 @@ def ai_ml_filter_chart_data():
         category = data['category']  # Value to filter by
         x_axis = data['x_axis']      # Region column name
 
+        print("Category:", category)
+        print("X-Axis:", x_axis)
+
         # Filter the DataFrame dynamically based on x_axis and category
         dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
         filtered_dataframe = dataframe[dataframe[x_axis] == category]
 
         print("Filtered DataFrame:", filtered_dataframe)
         ai_ml_charts_details = analyze_data(filtered_dataframe)
-        print("AI/ML Charts Details:", ai_ml_charts_details)
+        # print("AI/ML Charts Details:", ai_ml_charts_details)
 
         return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
     except Exception as e:
