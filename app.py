@@ -2283,6 +2283,53 @@ def is_table_used_in_charts( table_name):
     return cur.fetchone()[0]
 
 
+def get_table_columns(table_name,company_name):
+    company = company_name
+    conn = get_company_db_connection(company)
+    print("company",conn)
+    if conn is None:
+        print("Failed to connect to the database.")
+        return []
+    
+    try:
+        cur = conn.cursor()
+        print(f"Executing query to fetch columns for table: {table_name}")
+        cur.execute(
+            """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s AND table_schema = 'public'  -- Adjust schema if necessary
+            """,
+            (table_name,)
+        )
+        columns = [row[0] for row in cur.fetchall()]
+        print("Columns fetched:", columns)
+        cur.close()
+        conn.close()
+        return columns
+    except Exception as e:
+        print(f"Error fetching columns for table {table_name}: {e}")
+        return []
+    
+@app.route('/api/table-columns/<table_name>', methods=['GET'])
+def api_get_table_columns(table_name):
+    try:
+        # Get the company name from the query parameters
+        company_name = request.args.get('companyName')
+        
+        # Ensure the company_name is provided
+        if not company_name:
+            return jsonify({"error": "Company name is required"}), 400
+        
+        columns = get_table_columns(table_name, company_name)
+        print("columns", columns)
+        return jsonify(columns), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
 # PUSH DATE 17-12-2024
 
 
