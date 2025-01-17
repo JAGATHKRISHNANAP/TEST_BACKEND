@@ -122,6 +122,7 @@ import psycopg2
 import re
 from psycopg2 import sql
 
+from signup.signup import is_table_used_in_charts 
 
 # Sanitize column names by replacing non-alphanumeric characters with underscores and converting to lowercase
 def sanitize_column_name(col_name):
@@ -143,7 +144,21 @@ def identify_primary_key(df):
         if df[col].is_unique:
             return col
     return None
+def check_table_usage(cur,table_name):
+    
+    if not table_name:
+        return jsonify({"error": "Table name is required"}), 400
 
+    # Remove any surrounding quotes from the table name
+    table_name = table_name.strip('"').strip("'")
+
+    # Debugging: Print the received table name
+    print(f"Received table name: {table_name}")
+
+    # Check if the table is used for chart creation
+    is_in_use = is_table_used_in_charts(table_name)
+    print("is_in_use",is_in_use)
+    return is_in_use
 
 # Function to validate if the table exists
 def validate_table_structure(cur, table_name):
@@ -166,6 +181,15 @@ def validate_table_structure(cur, table_name):
 #         return 'DATE'
 #     else:
 #         return 'VARCHAR'
+
+def preprocess_dates(df):
+    # Identify columns that are of string type
+    date_columns = [
+        col for col in df.columns if df[col].dtype == 'object' and df[col].str.match(r"^\d{1,2}-\d{1,2}-\d{4}$").any()
+    ]
+    for col in date_columns:
+        df[col] = pd.to_datetime(df[col], format='%d-%m-%Y', errors='coerce').dt.strftime('%Y-%m-%d')
+    return df
 
 def determine_sql_data_type(value):
     # Check for string values resembling dates
@@ -204,6 +228,8 @@ def upload_csv_to_postgresql(db_name, username, password, csv_file_name, host='l
         return
 
     df = pd.read_csv(csv_file_path)
+    df = preprocess_dates(df)
+    
     duplicate_columns = check_repeating_columns(df)
     if duplicate_columns:
         print(f"Error: Duplicate columns found in the CSV: {duplicate_columns}")
@@ -233,13 +259,62 @@ def upload_csv_to_postgresql(db_name, username, password, csv_file_name, host='l
 
     # Validate table structure
     table_exists = validate_table_structure(cur, table_name)
-    if not table_exists:
-        # Define table columns with data types
+
+    
+    # if not table_exists:
+    #     # Define table columns with data types
+    #     columns = ', '.join('"{}" {}'.format(col, determine_sql_data_type(df[col])) for col in df.columns)
+    #     create_table_query = 'CREATE TABLE IF NOT EXISTS "{}" ({}, PRIMARY KEY ({}));'.format(table_name, columns, primary_key_column)
+    #     cur.execute(create_table_query)
+    # else:
+    #     print(f"Table '{table_name}' already exists.")
+    if table_exists:
+        is_table_in_use = check_table_usage(cur, table_name)
+        print(f"Table '{table_name}' is in use: {is_table_in_use}")
+
+        
+        if table_exists and is_table_in_use == False:
+            cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}';")
+            existing_columns = [row[0] for row in cur.fetchall()]
+
+            # Detect and delete extra columns
+            columns_to_delete = [col for col in existing_columns if col not in df.columns]
+            for col in columns_to_delete:
+                alter_query = sql.SQL('ALTER TABLE {} DROP COLUMN {}').format(
+                    sql.Identifier(table_name),
+                    sql.Identifier(col)
+                )
+                try:
+                    cur.execute(alter_query)
+                    print(f"Deleted column '{col}' from table '{table_name}'.")
+                except Exception as e:
+                    print(f"Error deleting column '{col}': {e}")
+            
+            # Detect and add missing columns
+            missing_columns = [col for col in df.columns if col not in existing_columns]
+            for col in missing_columns:
+                col_type = determine_sql_data_type(df[col])
+                alter_query = sql.SQL('ALTER TABLE {} ADD COLUMN {} {}').format(
+                    sql.Identifier(table_name),
+                    sql.Identifier(col),
+                    sql.SQL(col_type)
+                )
+                try:
+                    cur.execute(alter_query)
+                    print(f"Added column '{col}' to table '{table_name}'.")
+                except Exception as e:
+                    print(f"Error adding column '{col}': {e}")
+
+    else:
+        # Create table if it does not exist
         columns = ', '.join('"{}" {}'.format(col, determine_sql_data_type(df[col])) for col in df.columns)
         create_table_query = 'CREATE TABLE IF NOT EXISTS "{}" ({}, PRIMARY KEY ({}));'.format(table_name, columns, primary_key_column)
-        cur.execute(create_table_query)
-    else:
-        print(f"Table '{table_name}' already exists.")
+        try:
+            cur.execute(create_table_query)
+            print(f"Created table '{table_name}'.")
+        except Exception as e:
+            print(f"Error creating table '{table_name}': {e}")
+            return
 
     # Delete existing rows matching primary key
     for _, row in df.iterrows():

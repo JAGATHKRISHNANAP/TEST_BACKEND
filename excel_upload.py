@@ -6,6 +6,24 @@ import psycopg2
 import re
 from psycopg2 import sql
 import traceback
+from flask import Flask, request, jsonify
+
+from signup.signup import is_table_used_in_charts 
+def check_table_usage(cur,table_name):
+    
+    if not table_name:
+        return jsonify({"error": "Table name is required"}), 400
+
+    # Remove any surrounding quotes from the table name
+    table_name = table_name.strip('"').strip("'")
+
+    # Debugging: Print the received table name
+    print(f"Received table name: {table_name}")
+
+    # Check if the table is used for chart creation
+    is_in_use = is_table_used_in_charts(table_name)
+    print("is_in_use",is_in_use)
+    return is_in_use
 
 # Function to sanitize column names (replace spaces and special characters with underscores)
 def sanitize_column_name(col_name):
@@ -78,7 +96,30 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
     
             table_exists = validate_table_structure(cur, table_name, df)
             print(f"Table exists for {table_name}: {table_exists}")
+            is_table_in_use = check_table_usage(cur, table_name)  # Add your implementation for this function
+            print(f"Table '{table_name}' is in use: {is_table_in_use}")
 
+            if table_exists and is_table_in_use == False:
+
+                # If table exists and is NOT in use, handle missing columns
+                cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}';")
+                existing_columns = [row[0] for row in cur.fetchall()]
+                print(f"Existing columns in table '{table_name}': {existing_columns}")
+
+                # Find columns to delete (existing in table but missing in uploaded file)
+                columns_to_delete = [col for col in existing_columns if col not in df.columns]
+
+                for col in columns_to_delete:
+                    alter_query = sql.SQL('ALTER TABLE {} DROP COLUMN {}').format(
+                        sql.Identifier(table_name),
+                        sql.Identifier(col)
+                    )
+                    try:
+                        cur.execute(alter_query)
+                        print(f"Deleted column '{col}' from table '{table_name}'.")
+                    except Exception as e:
+                        print(f"Error deleting column '{col}' from table '{table_name}': {str(e)}")
+                        continue
             if table_exists:
                 print(f"Validating and adding missing columns to table '{table_name}'.")
                 
