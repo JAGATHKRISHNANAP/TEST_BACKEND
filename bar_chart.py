@@ -667,7 +667,7 @@ def fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_colum
 
 from psycopg2 import sql
 
-def fetch_column_name(table_name, x_axis_columns, db_nameeee):
+def fetch_column_name(table_name, x_axis_columns, db_nameeee,xAxis):
     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     cur = conn.cursor()
 

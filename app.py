@@ -153,6 +153,19 @@ def upload_file_excel():
         return jsonify({'message': result,'status':False}), 500
 
 
+# @app.route('/uploadcsv', methods=['POST'])
+# def upload_file_csv():
+#     excel_file = request.files['file']
+#     database_name = request.form.get('company_database')
+#     print("company_database====================",database_name)  
+#     excel_file_name = secure_filename(excel_file.filename)
+#     os.makedirs('tmp', exist_ok=True)
+#     temp_file_path = f'tmp/{excel_file_name}'
+#     excel_file.save(temp_file_path)
+#     # database_name='csv_database'
+#     upload_csv_to_postgresql(database_name, username, password, temp_file_path, host, port)
+#     return jsonify({'message': 'File uploaded successfully'})
+
 @app.route('/uploadcsv', methods=['POST'])
 def upload_file_csv():
     excel_file = request.files['file']
@@ -736,11 +749,15 @@ def get_filter_options(selectedTable, columnName):
     column_name=columnName
     db_nameeee= request.args.get('databaseName')
     xAxis = request.args.getlist('xAxis[]')  # Use getlist() to retrieve all values
-    # print("xAxis====================",xAxis)
-    # print("db_nameeee====================",db_nameeee)
-    # print("column_name====================",column_name)    
-    column_data=fetch_column_name(table_name, column_name, db_nameeee)
+    print("(*********************************************************)")
+
+    print("xAxis====================",xAxis)
+    print("db_nameeee====================",db_nameeee)
+    print("column_name====================",column_name)    
+    column_data=fetch_column_name(table_name, column_name, db_nameeee,xAxis)
     print("column_data====================",column_data)
+    print("(*********************************************************)")
+
     return jsonify(column_data)
 
 def create_table():
