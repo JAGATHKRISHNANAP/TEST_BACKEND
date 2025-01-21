@@ -346,16 +346,3 @@ def create_user_table_if_not_exists(cursor):
         );
     """)
 
-# Function to check if a table is used in chart creation
-def is_table_used_in_charts( table_name):
-    conn = get_db_connection(dbname="datasource")
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT EXISTS (
-            SELECT 1 FROM new_dashboard_details_new WHERE selected_table = %s
-        )
-        """,
-        (table_name,)
-    )
-    return cur.fetchone()[0]

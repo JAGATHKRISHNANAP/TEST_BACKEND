@@ -195,12 +195,18 @@ def remove_symbols(value):
 #         print("Error: Unable to connect to the database.")
 #         print(e)
 #         return {'numeric_columns': [], 'text_columns': []}
-def get_column_names(db_name, username, password, table_name,selectedUser, host='localhost', port='5432', connection_type='local'):
+def get_column_names(db_name, username, password, table_name,selectedUser, host='localhost', port='5432', connection_type='local',force_refresh=True):
     global global_df
     oldtablename = getattr(get_column_names, 'oldtablename', None)
     print('connectontype',connection_type)
-    if oldtablename == table_name and global_df is not None:
-        print("Using cached data from global_df")
+    # if oldtablename == table_name and global_df is not None:
+    #     print("Using cached data from global_df")
+    if force_refresh or oldtablename != table_name:
+        print("Refreshing data cache...")
+        global_df = None
+        get_column_names.oldtablename = None
+
+    if global_df is not None:
         
         numeric_columns = global_df.select_dtypes(include=[float, int]).columns.tolist()
         text_columns = global_df.select_dtypes(include=[object]).columns.tolist()
@@ -267,7 +273,7 @@ def get_column_names(db_name, username, password, table_name,selectedUser, host=
         cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")  # Get the column names without fetching data
         column_names = [desc[0] for desc in cursor.description]
 
-        cursor.execute(f"SELECT * FROM {table_name}")
+        cursor.execute(f"SELECT * FROM {table_name} ")
         data = cursor.fetchall()
         df = pd.DataFrame(data, columns=column_names)
         global_df = df
@@ -796,10 +802,10 @@ def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column
 
 from psycopg2 import sql
 def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
-    print("connection_type:", selectedUser)
+    print("selectedUser:", selectedUser)
     
     # Connect to the appropriate database based on connection_type
-    if selectedUser == 'null':
+    if not selectedUser or selectedUser.lower() == 'null':
         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
     else:  # External connection
         connection_details = fetch_external_db_connection(db_name,selectedUser)

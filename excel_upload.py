@@ -8,7 +8,8 @@ from psycopg2 import sql
 import traceback
 from flask import Flask, request, jsonify
 
-from signup.signup import is_table_used_in_charts 
+from tqdm import tqdm
+from upload import is_table_used_in_charts 
 def check_table_usage(cur,table_name):
     
     if not table_name:
@@ -54,6 +55,8 @@ def determine_sql_data_type(value):
         return 'BOOLEAN'
     elif pd.api.types.is_datetime64_any_dtype(value):
         return 'DATE'
+    elif pd.api.types.is_numeric_dtype(value):
+        return 'DOUBLE PRECISION' 
     else:
         return 'VARCHAR'
 
@@ -137,6 +140,10 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
                         col_type = 'INTEGER'
                     elif df[col].dropna().apply(lambda x: isinstance(x, float)).all():
                         col_type = 'NUMERIC'
+                    elif pd.to_datetime(df[col].dropna(), errors='coerce').notna().all():
+                        df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
+                        col_type = 'DATE'
+
                     else:
                         col_type = 'VARCHAR'  # Default to VARCHAR for mixed or empty columns
 
@@ -165,6 +172,9 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
                         col_type = 'INTEGER'
                     elif df[col].dropna().apply(lambda x: isinstance(x, float)).all():
                         col_type = 'NUMERIC'
+                    elif pd.to_datetime(df[col].dropna(), errors='coerce').notna().all():
+                        df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
+                        col_type = 'DATE'
                     else:
                         col_type = 'VARCHAR'  # Default to VARCHAR for mixed or empty columns
                     
@@ -215,19 +225,56 @@ def upload_excel_to_postgresql(database_name, username, password, excel_file_nam
 
             print(f"Deleted {len(primary_key_values)} rows with matching primary key values in table '{table_name}'.")
 
-            # Iterate over rows in the DataFrame and insert new or updated rows
+            # # Iterate over rows in the DataFrame and insert new or updated rows
+            # for _, row in df.iterrows():
+            #     for col in df.select_dtypes(include=['datetime']).columns:
+            #         if pd.isna(row[col]):
+            #             row[col] = None  # Replace invalid dates with None (NULL)
+
+            #     insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+            #         sql.Identifier(table_name),
+            #         sql.SQL(', ').join(map(sql.Identifier, df.columns)),
+            #         sql.SQL(', ').join(sql.Placeholder() for _ in df.columns)
+            #     )
+            #     cur.execute(insert_query, tuple(row))
+            #     print(f"Inserted row with {primary_key_column} = {row[primary_key_column]} in table '{table_name}'.")
+           # Check if rows were deleted
+            if cur.rowcount > 0:
+                print(f"Deleted {cur.rowcount} rows with matching primary key values in table '{table_name}'.")
+            else:
+                print("No rows were deleted.")
+
+            # Prepare rows for batch insertion
+            rows_to_insert = []
             for _, row in df.iterrows():
                 for col in df.select_dtypes(include=['datetime']).columns:
                     if pd.isna(row[col]):
                         row[col] = None  # Replace invalid dates with None (NULL)
+                rows_to_insert.append(tuple(row))
 
-                insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                    sql.Identifier(table_name),
-                    sql.SQL(', ').join(map(sql.Identifier, df.columns)),
-                    sql.SQL(', ').join(sql.Placeholder() for _ in df.columns)
-                )
-                cur.execute(insert_query, tuple(row))
-                print(f"Inserted row with {primary_key_column} = {row[primary_key_column]} in table '{table_name}'.")
+            # Batch insert into the database with progress tracking
+            placeholders = ', '.join(['%s'] * len(df.columns))
+            batch_insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                sql.Identifier(table_name),
+                sql.SQL(', ').join(map(sql.Identifier, df.columns)),
+                sql.SQL(placeholders)
+            )
+
+            try:
+                # Define batch size for inserts
+                batch_size = 1000
+                total_batches = (len(rows_to_insert) + batch_size - 1) // batch_size  # Ceiling division
+
+                with tqdm(total=len(rows_to_insert), desc="Inserting rows", unit="row") as pbar:
+                    for i in range(0, len(rows_to_insert), batch_size):
+                        batch = rows_to_insert[i:i + batch_size]
+                        cur.executemany(batch_insert_query.as_string(conn), batch)
+                        conn.commit()  # Commit after each batch
+                        pbar.update(len(batch))  # Update the progress bar
+
+                print(f"Batch inserted {len(rows_to_insert)} rows into table '{table_name}'.")
+            except Exception as e:
+                print(f"Error during batch insert: {str(e)}")
 
             file_name = f"{table_name}.xlsx"
             file_path = os.path.join(directory_path, file_name)

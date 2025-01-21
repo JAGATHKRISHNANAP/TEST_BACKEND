@@ -122,7 +122,7 @@ import psycopg2
 import re
 from psycopg2 import sql
 
-from signup.signup import is_table_used_in_charts 
+from upload import is_table_used_in_charts 
 
 # Sanitize column names by replacing non-alphanumeric characters with underscores and converting to lowercase
 def sanitize_column_name(col_name):

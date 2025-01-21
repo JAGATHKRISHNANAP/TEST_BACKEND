@@ -1,7 +1,6 @@
 import os
 from flask_cors import CORS
 import json
-
 from flask import Flask, request, jsonify,session
 from werkzeug.utils import secure_filename
 from excel_upload import upload_excel_to_postgresql
@@ -12,14 +11,14 @@ import traceback
 from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
 import bar_chart as bc
 from dashboard_save.dashboard_save import insert_combined_chart_details, create_dashboard_table, create_connection,get_dashboard_names,get_dashboard_view_chart_data
-from signup.signup import insert_user_data,fetch_usersdata,fetch_login_data,connect_db,create_user_table,encrypt_password,fetch_company_login_data,is_table_used_in_charts
+from signup.signup import insert_user_data,fetch_usersdata,fetch_login_data,connect_db,create_user_table,encrypt_password,fetch_company_login_data
 import psycopg2
 from audio import allowed_file,transcribe_audio_with_timestamps,save_file_to_db
 from histogram_utils import generate_histogram_details,handle_column_data_types
 from json_upload import upload_json_to_postgresql
 from config import  ALLOWED_EXTENSIONS,DB_NAME,USER_NAME,PASSWORD,HOST,PORT
 from ai_charts import analyze_data
-
+from upload import is_table_used_in_charts
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import pandas as pd
@@ -154,6 +153,33 @@ def load_data():
     print("Checked paths:", checked_paths)
     return jsonify({'message': 'Data loaded successfully'})
 
+@app.route('/ai_ml_filter_chartdata', methods=['POST'])
+def ai_ml_filter_chart_data():
+    try:
+        # Extract data from the POST request
+        data = request.get_json()
+        if not data or 'category' not in data or 'x_axis' not in data:
+            return jsonify({"error": "category and x_axis are required"}), 400
+
+        category = data['category']  # Value to filter by
+        x_axis = data['x_axis']      # Region column name
+
+        print("Category:", category)
+        print("X-Axis:", x_axis)
+
+        # Filter the DataFrame dynamically based on x_axis and category
+        dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
+        filtered_dataframe = dataframe[dataframe[x_axis] == category]
+
+        print("Filtered DataFrame:", filtered_dataframe)
+        ai_ml_charts_details = analyze_data(filtered_dataframe)
+        # print("AI/ML Charts Details:", ai_ml_charts_details)
+
+        return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/table_names')
 def get_table_names():
     db_name = request.args.get('databaseName')
@@ -179,7 +205,15 @@ def get_columns(table_name):
     db_name= request.args.get('databaseName')
     connectionType= request.args.get('connectionType')
     selectedUser=request.args.get('selectedUser')
+    forceRefresh = request.args.get('forceRefresh', 'false').lower() == 'true'
+    print(f"Request Parameters - Database: {db_name}, Connection Type: {connectionType}, User: {selectedUser}")
 
+    # Clear the cache if forceRefresh is true
+    if forceRefresh:
+        print("Forcing cache refresh.")
+        global global_df
+        global_df = None
+        get_column_names.oldtablename = None
     print("connectionType",connectionType)
     column_names = get_column_names(db_name, username, password, table_name,selectedUser, host, port,connectionType)
     print("column_names====================",column_names)
@@ -227,7 +261,9 @@ def join_tables():
 
 @app.route('/plot_chart', methods=['POST', 'GET'])
 def get_bar_chart_route():
+    
     df = bc.global_df
+    
     df_json = df.to_json(orient='split')  # Convert the DataFrame to JSON
     data = request.json
 
@@ -239,6 +275,7 @@ def get_bar_chart_route():
     db_nameeee = data['databaseName']
     selectedUser=data['selectedUser']
     chart_data=data['chartType']
+    print("df",df)
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
@@ -635,11 +672,11 @@ def get_filter_options(selectedTable, columnName):
     column_name = columnName
     db_name = request.args.get('databaseName')
     selectedUser = request.args.get('selectedUser','null')  # Default to 'local' if not specified
-
+    
     print("table_name====================", table_name)
     print("db_name====================", db_name)
     print("column_name====================", column_name)
-    print("connection_type====================", selectedUser)
+    print("selectedUser====================", selectedUser)
 
     # Fetch data from cache or database
     column_data = fetch_column_name_with_cache(table_name, column_name, db_name, selectedUser)
@@ -1765,10 +1802,15 @@ def get_roles():
 
 @app.route('/fetchglobeldataframe', methods=['GET'])
 def get_hello_data():
-    dataframe=bc.global_df
-    print("dataframe........................",dataframe)
+    dataframe = bc.global_df
+    print("dataframe........................", dataframe)
+    
+    # Convert datetime columns to string to avoid NaT issues
+    for col in dataframe.select_dtypes(include=['datetime64[ns]']).columns:
+        dataframe[col] = dataframe[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('null')
+    
     dataframe_dict = dataframe.to_dict(orient='records')
-    return jsonify({"data frame":dataframe_dict})
+    return jsonify({"data frame": dataframe_dict})
 
 @app.route('/aichartdata', methods=['GET'])
 def ai_barchart():
@@ -2374,40 +2416,6 @@ def check_table_usage():
     print("is_in_use",is_in_use)
     return jsonify({"isInUse": is_in_use})
 
-
-
-
-# @app.route('/api/fetchTableDetails', methods=['GET'])
-# def get_table_data():
-#     company_name = request.args.get('databaseName')  # Get company name from the query
-#     table_name = request.args.get('selectedTable')  # Get the table name from the query
-    
-#     if not company_name or not table_name:
-#         return jsonify({'error': 'Database name and table name are required'}), 400
-
-#     try:
-#         # Connect to the database
-#         connection = get_company_db_connection(company_name)
-#         cursor = connection.cursor(cursor_factory=RealDictCursor)
-
-#         # Dynamically select the database schema
-#         cursor.execute(f'SET search_path TO {company_name};')
-
-#         # Query the selected table
-#         cursor.execute(f'SELECT * FROM {table_name};')
-#         rows = cursor.fetchall()
-
-#         # Close the connection
-#         cursor.close()
-#         connection.close()
-
-#         # Return the fetched data as JSON
-#         return jsonify(rows)
-
-#     except Exception as e:
-#         # Log the error for better debugging
-#         print(f"Error: {e}")
-#         return jsonify({'error': str(e)}), 500
 @app.route('/api/fetchTableDetails', methods=['GET'])
 def get_table_data():
     company_name = request.args.get('databaseName')  # Get company name from the query
@@ -2532,115 +2540,7 @@ except cx_Oracle.InterfaceError as e:
         print("Oracle Client library has already been initialized. Skipping re-initialization.")
     else:
         raise e
-# @app.route('/connect', methods=['POST'])
-# def connect_and_fetch_tables():
-#     data = request.json
-#     dbType = data.get('dbType')
-#     username = data.get('username')
-#     password = data.get('password')
-#     host = data.get('host', 'localhost')  # Default to localhost if not provided
-#     port = data.get('port')  # Port should be provided based on the database type
-#     db_name = data.get('dbName')
-#     print("data",data)
-#     try:
-#         if dbType == "PostgreSQL":
-#             # Connect to PostgreSQL
-#             conn = psycopg2.connect(
-#                 dbname=db_name, user=username, password=password, host=host, port=port
-#             )
-#             cursor = conn.cursor()
-#             cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
-#             tables = [row[0] for row in cursor.fetchall()]
-#             conn.close()
-#         elif dbType == "MongoDB":
-#             # Connect to MongoDB
-#             mongo_uri = f"mongodb://{username}:{password}@{host}:{port}/{db_name}"
-#             client = MongoClient(mongo_uri)
-#             db = client[db_name]
-#             tables = db.list_collection_names()
-#         elif dbType == "MySQL":
-#             # Connect to MySQL
-#             conn = mysql.connector.connect(
-#                 host=host, user=username, password=password, database=db_name, port=port
-#             )
-#             cursor = conn.cursor()
-#             cursor.execute("SHOW TABLES;")
-#             tables = [row[0] for row in cursor.fetchall()]
-#             conn.close()
-#         # elif dbType == "Oracle":
-#         #     # Connect to Oracle
-#         #     dsn = cx_Oracle.makedsn(host, port, service_name=db_name)
-#         #     conn = cx_Oracle.connect(user=username, password=password, dsn=dsn)
-#         #     cursor = conn.cursor()
-#         #     cursor.execute("SELECT table_name FROM all_tables")
-#         #     tables = [row[0] for row in cursor.fetchall()]
-#         #     conn.close()
-#         if dbType == "Oracle":
-#             try:
-#                 import cx_Oracle
 
-#                 # Ensure the Oracle Instant Client is correctly configured
-#                 cx_Oracle.init_oracle_client(lib_dir="C:\instantclient-basic-windows.x64-23.6.0.24.10\instantclient_23_6")  # Update this path for your system
-                
-#                 # Connect to Oracle
-#                 conn = cx_Oracle.connect(
-#                     user=username,
-#                     password=password,
-#                     dsn=f"{host}:{port}/{db_name}"  # For Oracle, the DSN includes host, port, and service name
-#                 )
-#                 cursor = conn.cursor()
-#                 print("Connection successful:", conn)
-
-#                 # Query to get all table names from the current schema
-#                 cursor.execute("""
-#                     SELECT table_name 
-#                     FROM all_tables 
-#                     WHERE owner = :schema_name
-#                 """, {"schema_name": username.upper()})  # Pass parameter as a dictionary
-
-#                 tables = [row[0] for row in cursor.fetchall()]
-#                 conn.close()
-            
-#             except cx_Oracle.DatabaseError as e:
-#                 print(f"Oracle Database Error: {str(e)}")
-#                 raise e
-            
-#             except cx_Oracle.InterfaceError as e:
-#                 print("DPI-1047 detected. Switching to oracledb if available.")
-#                 try:
-#                     import oracledb
-
-#                     # Using oracledb as a fallback
-#                     conn = oracledb.connect(
-#                         user=username,
-#                         password=password,
-#                         dsn=f"{host}:{port}/{db_name}"
-#                     )
-#                     cursor = conn.cursor()
-#                     print("Connection successful with oracledb:", conn)
-
-#                     # Query to get all table names from the current schema
-#                     cursor.execute("""
-#                         SELECT table_name 
-#                         FROM all_tables 
-#                         WHERE owner = :schema_name
-#                     """, {"schema_name": username.upper()})  # Pass parameter as a dictionary
-
-#                     tables = [row[0] for row in cursor.fetchall()]
-#                     conn.close()
-#                 except Exception as fallback_error:
-#                     return jsonify(success=False, error=f"Failed to connect using oracledb: {str(fallback_error)}")
-            
-#             except Exception as general_error:
-#                 return jsonify(success=False, error=f"Failed to connect: {str(general_error)}")
-
-#         else:
-#             return jsonify(success=False, error="Unsupported database type.")
-
-        
-#         return jsonify(success=True, tables=tables)
-#     except Exception as e:
-#         return jsonify(success=False, error=f"Failed to connect: {str(e)}")
 
 @app.route('/connect', methods=['POST'])
 def connect_and_fetch_tables():
@@ -2761,24 +2661,6 @@ def fetch_external_db_connection(company_name,savename):
         print(f"Error fetching connection details: {e}")
         return None
 
-# # Function to fetch table names from the external database
-# def fetch_table_names_from_external_db(db_details):
-#     try:
-#         # Connect to the external database using the connection details
-#         conn = psycopg2.connect(
-#             host=db_details['host'],
-#             database=db_details['database'],
-#             user=db_details['user'],
-#             password=db_details['password']
-#         )
-#         cursor = conn.cursor()
-#         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
-#         table_names = cursor.fetchall()
-#         conn.close()
-#         return [table[0] for table in table_names]  # return list of table names
-#     except Exception as e:
-#         print(f"Error fetching table names: {e}")
-#         return []
 def fetch_table_names_from_external_db(db_details):
     try:
         db_type = db_details.get('dbType')
@@ -2893,25 +2775,6 @@ def get_externaltable_data(table_name):
             return jsonify({"error": f"Error fetching data from table '{table_name}': {str(e)}"}), 500
     else:
         return jsonify({"error": "Could not retrieve external database connection details"}), 500
-# def fetch_data_from_table(db_details, table_name):
-#     try:
-#         conn = psycopg2.connect(
-#             host=db_details["host"],
-#             database=db_details["database"],
-#             user=db_details["user"],
-#             password=db_details["password"]
-#         )
-#         cursor = conn.cursor()
-#         query = f"SELECT * FROM {table_name} LIMIT 10;"  # Adjust the query as needed
-#         cursor.execute(query)
-#         rows = cursor.fetchall()
-#         columns = [desc[0] for desc in cursor.description]
-#         return [dict(zip(columns, row)) for row in rows]
-#     except Exception as e:
-#         raise Exception(f"Error querying table '{table_name}': {str(e)}")
-#     finally:
-#         if conn:
-#             conn.close()
 
 def fetch_data_from_table(db_details, table_name):
     try:
@@ -3011,97 +2874,97 @@ def fetch_saved_names():
 
 
 
-import ast
-@app.route('/wordcloud-data', methods=['POST'])
-def wordcloud_data():
-    try:
-        data = request.json
-        checkedOption = data.get("checkedOption", [])
-        db_name = data.get("databaseName", "")
-        if not db_name:
-            return jsonify({"error": "Database name is missing"}), 400
-        conn = psycopg2.connect(f"dbname={db_name} user=postgres password=Gayu@123 host=localhost")
-        cur = conn.cursor()
+# import ast
+# @app.route('/wordcloud-data', methods=['POST'])
+# def wordcloud_data():
+#     try:
+#         data = request.json
+#         checkedOption = data.get("checkedOption", [])
+#         db_name = data.get("databaseName", "")
+#         if not db_name:
+#             return jsonify({"error": "Database name is missing"}), 400
+#         conn = psycopg2.connect(f"dbname={db_name} user=postgres password=Gayu@123 host=localhost")
+#         cur = conn.cursor()
 
-        category = data.get("category", [])
-        table_name = data.get("tableName", "")
-        if not category or not table_name:
-            return jsonify({"error": "Missing required parameters"}), 400
-        category_columns = ', '.join(category)
-        print(f"Category columns: {category_columns}")
-        print(f"table_name: {table_name}")
-        print(f"checkedOption: {checkedOption}")
+#         category = data.get("category", [])
+#         table_name = data.get("tableName", "")
+#         if not category or not table_name:
+#             return jsonify({"error": "Missing required parameters"}), 400
+#         category_columns = ', '.join(category)
+#         print(f"Category columns: {category_columns}")
+#         print(f"table_name: {table_name}")
+#         print(f"checkedOption: {checkedOption}")
 
-        if checkedOption:
-            # Flatten the list of lists and ensure they are strings
+#         if checkedOption:
+#             # Flatten the list of lists and ensure they are strings
             
-            # flattened_checkedOption = = list(itertools.chain(*checkedOption))
-            # print("flattened_checkedOption",flattened_checkedOption)
-            # Flatten the list
-            flattened_checkedOption = [name[0] for name in checkedOption]
+#             # flattened_checkedOption = = list(itertools.chain(*checkedOption))
+#             # print("flattened_checkedOption",flattened_checkedOption)
+#             # Flatten the list
+#             flattened_checkedOption = [name[0] for name in checkedOption]
 
-            # Print the flattened list to check the result
-            print("flattened_checkedOption:", flattened_checkedOption)
+#             # Print the flattened list to check the result
+#             print("flattened_checkedOption:", flattened_checkedOption)
 
-            # If you're dealing with string representations, use ast.literal_eval() to safely evaluate them
-            # (In case your data is coming as string representation of list)
-            flattened_checkedOption = [ast.literal_eval(name) if isinstance(name, str) else name for name in flattened_checkedOption]
+#             # If you're dealing with string representations, use ast.literal_eval() to safely evaluate them
+#             # (In case your data is coming as string representation of list)
+#             flattened_checkedOption = [ast.literal_eval(name) if isinstance(name, str) else name for name in flattened_checkedOption]
 
-            print("After eval (if necessary):", flattened_checkedOption)
-            # Create placeholders dynamically for the IN clause (using %s for each item)
-            placeholders = ', '.join('%s' * len(flattened_checkedOption))
+#             print("After eval (if necessary):", flattened_checkedOption)
+#             # Create placeholders dynamically for the IN clause (using %s for each item)
+#             placeholders = ', '.join('%s' * len(flattened_checkedOption))
 
 
-            # Create placeholders dynamically for the IN clause
-            placeholders = flattened_checkedOption
+#             # Create placeholders dynamically for the IN clause
+#             placeholders = flattened_checkedOption
 
-            # Query when a checked option is provided
-            query = f"""
-                SELECT word, COUNT(*) AS word_count
-                FROM (
-                    SELECT regexp_split_to_table({category_columns}, '\s+') AS word
-                    FROM {table_name}
-                    WHERE {category_columns} IN ({placeholders})
-                ) AS words
-                GROUP BY word
-                ORDER BY word_count DESC;
-            """
-            print(f"Executing query: {query}")
-            print(f"Parameters: {tuple(flattened_checkedOption)}")
+#             # Query when a checked option is provided
+#             query = f"""
+#                 SELECT word, COUNT(*) AS word_count
+#                 FROM (
+#                     SELECT regexp_split_to_table({category_columns}, '\s+') AS word
+#                     FROM {table_name}
+#                     WHERE {category_columns} IN ({placeholders})
+#                 ) AS words
+#                 GROUP BY word
+#                 ORDER BY word_count DESC;
+#             """
+#             print(f"Executing query: {query}")
+#             print(f"Parameters: {tuple(flattened_checkedOption)}")
 
-            # Execute the query with the flattened list as parameters
-            cur.execute(query, tuple(flattened_checkedOption))
-        else:
-            # Query when no checked option is provided
-            query = f"""
-                SELECT word, COUNT(*) AS word_count
-                FROM (
-                    SELECT regexp_split_to_table({category_columns}, '\s+') AS word
-                    FROM {table_name}
-                ) AS words
-                GROUP BY word
-                ORDER BY word_count DESC;
-            """
-            print(f"Executing query: {query}")
-            cur.execute(query)
+#             # Execute the query with the flattened list as parameters
+#             cur.execute(query, tuple(flattened_checkedOption))
+#         else:
+#             # Query when no checked option is provided
+#             query = f"""
+#                 SELECT word, COUNT(*) AS word_count
+#                 FROM (
+#                     SELECT regexp_split_to_table({category_columns}, '\s+') AS word
+#                     FROM {table_name}
+#                 ) AS words
+#                 GROUP BY word
+#                 ORDER BY word_count DESC;
+#             """
+#             print(f"Executing query: {query}")
+#             cur.execute(query)
 
-        results = cur.fetchall()
-        if not results:
-            print("No results returned from the query.")
-            return jsonify({"error": "No data available."}), 404
+#         results = cur.fetchall()
+#         if not results:
+#             print("No results returned from the query.")
+#             return jsonify({"error": "No data available."}), 404
 
-        response_data = {
-            "categories": [row[0] for row in results],
-            "values": [row[1] for row in results],
-        }
+#         response_data = {
+#             "categories": [row[0] for row in results],
+#             "values": [row[1] for row in results],
+#         }
 
-        cur.close()
-        conn.close()
-        return jsonify(response_data), 200
+#         cur.close()
+#         conn.close()
+#         return jsonify(response_data), 200
 
-    except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+#     except Exception as e:
+#         print(f"Error occurred: {str(e)}")
+#         return jsonify({"error": str(e)}), 500
 
 
 
@@ -3257,6 +3120,27 @@ def check_save_name():
     except Exception as e:
         print("Error checking save name:", e)
         return jsonify({'error': 'Database error'}), 500
+        
+
+
+@app.route('/check_filename/<fileName>', methods=['GET'])
+def check_filename(fileName):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        # Query to check if the file name exists
+        query = "SELECT COUNT(*) FROM dashboard_details_wu_id WHERE file_name = %s"
+        cursor.execute(query, (fileName,))
+        exists = cursor.fetchone()[0] > 0
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({'exists': exists})
+    except Exception as e:
+        print("Error checking file name:", e)
+        return jsonify({'error': 'Internal Server Error'}), 500
 
 
 if __name__ == "__main__":
