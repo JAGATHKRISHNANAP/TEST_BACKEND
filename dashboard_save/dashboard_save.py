@@ -4,6 +4,7 @@ from flask import jsonify, request
 from config import DB_NAME,USER_NAME,PASSWORD,HOST,PORT
 
 from histogram_utils import generate_histogram_details,handle_column_data_types
+from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data,fetch_ai_saved_chart_data
 
 def create_connection():
     try:
@@ -101,7 +102,7 @@ def get_dashboard_names(user_id,company_name_global):
 
 import psycopg2
 import pandas as pd
-from viewChart.viewChart import get_db_connection_view,fetch_chart_data
+# from viewChart.viewChart import get_db_connection_view,fetch_chart_data
 from bar_chart import fetchText_data
 
 
@@ -559,6 +560,7 @@ def get_dashboard_view_chart_data(chart_ids):
 
                     # Proceed with category and value generation for non-singleValueChart types
                     connection = get_db_connection_view(database_name)
+                    masterdatabasecon=create_connection()
                     dataframe = fetch_chart_data(connection, table_name)
                     print("Chart ID", chart_id)
                     print("Chart Type", chart_type)
@@ -677,6 +679,23 @@ def get_dashboard_view_chart_data(chart_ids):
                         except Exception as e:
                             print("Error while processing chart:", e)
                             return jsonify({"error": "An error occurred while generating the chart."}), 500
+                        
+
+                    elif chart_type == "AiCharts":
+                        try:
+                            # Fetch chart data
+                            df=fetch_ai_saved_chart_data(masterdatabasecon, tableName="new_dashboard_details_new",chart_id=chart_id)
+                            print("Chart ID", chart_id)
+                            connection.close()
+
+                            chart_data_list.append({
+                             "histogram_details": df,  
+                             "chart_type": chart_type
+                        })
+                        except Exception as e:
+                            print("Error while processing chart:", e)
+                            return jsonify({"error": "An error occurred while generating the chart."}), 500
+
 
 
 

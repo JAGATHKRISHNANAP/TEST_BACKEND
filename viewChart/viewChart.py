@@ -35,16 +35,12 @@ def fetch_chart_data(connection, tableName):
         query = query.format(
             table=sql.Identifier(tableName)
         )
-
         cursor.execute(query)
         results = cursor.fetchall()
-
         # Fetch the column names from the cursor
         column_names = [desc[0] for desc in cursor.description]
-
         # Convert the results to a DataFrame with the column names
         df = pd.DataFrame(results, columns=column_names)
-
         cursor.close()
 
         return df
@@ -53,29 +49,126 @@ def fetch_chart_data(connection, tableName):
         raise Exception(f"Error fetching data from {tableName}: {str(e)}")
     
 
-def fetch_AI_chart_data(connection, tableName):
+
+
+# def fetch_ai_saved_chart_data(connection, tableName):
+#     try:
+#         cursor = connection.cursor()
+#         # Use SQL composition to safely query using dynamic table and column names
+#         query = sql.SQL("SELECT * FROM {table}")
+#         query = query.format(
+#             table=sql.Identifier(tableName)
+#         )
+#         cursor.execute(query)
+#         results = cursor.fetchall()
+#         # Fetch the column names from the cursor
+#         column_names = [desc[0] for desc in cursor.description]
+#         # Convert the results to a DataFrame with the column names
+#         df = pd.DataFrame(results, columns=column_names)
+#         # Ensure numeric columns are properly cleaned and converted
+#         for column in df.select_dtypes(include=[object]).columns:
+#             # Try to convert columns to numeric if possible
+#             df[column] = pd.to_numeric(df[column], errors='ignore')
+#         # Filter numeric and text columns
+#         numeric_columns = df.select_dtypes(include=[float, int]).columns.tolist()
+#         text_columns = df.select_dtypes(include=[object]).columns.tolist()
+#         print("Numeric columns:", numeric_columns)
+#         print("Text columns:", text_columns)
+
+#         cursor.close()
+#         return df
+
+#     except Exception as e:
+#         raise Exception(f"Error fetching data from {tableName}: {str(e)}")
+
+
+# from psycopg2 import sql
+
+import json
+# from psycopg2 import sql
+
+def fetch_ai_saved_chart_data(connection, tableName, chart_id):
     try:
         cursor = connection.cursor()
 
+        # Safely construct the query to fetch data from the dynamic table
+        query = sql.SQL(
+            "SELECT ai_chart_data FROM {table} WHERE id = %s"
+        ).format(
+            table=sql.Identifier(tableName)  # Safely handle dynamic table names
+        )
+
+        # Execute the query with the parameterized chart_id
+        cursor.execute(query, (chart_id,))
+        results = cursor.fetchall()
+
+        # Process results: Deserialize JSON if stored as JSON
+        chart_data = []
+        for record in results:
+            ai_chart_data = record[0]
+            if isinstance(ai_chart_data, list):
+                ai_chart_data = json.dumps(ai_chart_data)  # Convert list to JSON string
+            chart_data.append(json.loads(ai_chart_data))
+
+        return chart_data
+
+    except Exception as e:
+        # Use logging for better error tracking
+        print("Error fetching AI chart data:", e)
+        return None
+
+    finally:
+        # Ensure cursor is closed
+        cursor.close()
+
+# Example usage:
+# df = fetch_ai_saved_chart_data(masterdatabasecon, tableName="new_dashboard_details_new", chart_id=chart_id)
+# print("AI/ML chart details:", df)
+# return jsonify({
+#     "histogram_details": df,
+# }), 200
+
+
+# def fetch_ai_saved_chart_data(connection, tableName,chart_id):
+#     try:
+#         cursor = connection.cursor()
+
+#         # Safely construct the query to fetch data from the dynamic table
+#         query = sql.SQL("SELECT ai_chart_data FROM {table}").format(
+#             table=sql.Identifier(tableName)  # Safely handle dynamic table names
+#         )
+
+#         cursor.execute(query)
+#         results = cursor.fetchall()
+
+#         # Return results or process them further if needed
+#         return results
+
+#     except Exception as e:
+#         print("Error fetching AI chart data:", e)
+#         return None
+
+#     finally:
+#         cursor.close()
+
+
+
+
+def fetch_AI_chart_data(connection, tableName):
+    try:
+        cursor = connection.cursor()
         # Use SQL composition to safely query using dynamic table and column names
         query = sql.SQL("SELECT * FROM {table}")
         query = query.format(
             table=sql.Identifier(tableName)
         )
-
         cursor.execute(query)
         results = cursor.fetchall()
-
         # Fetch the column names from the cursor
         # column_names = [desc[0] for desc in cursor.description]
-
-        # Convert the results to a DataFrame with the column names
         df = pd.DataFrame(results)
-
         cursor.close()
-
         return df
-
     except Exception as e:
         raise Exception(f"Error fetching data from {tableName}: {str(e)}")
     

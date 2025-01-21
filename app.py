@@ -23,7 +23,7 @@ import pandas as pd
 import logging
 from flask_session import Session  # Flask-Session for server-side session handling
 import uuid
-from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data
+from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data,fetch_ai_saved_chart_data
 from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
 from ai_charts import analyze_data
 
@@ -781,7 +781,9 @@ def create_table():
                 chart_color VARCHAR,
                 chart_heading VARCHAR,
                 drilldown_chart_color VARCHAR,
-                filter_options VARCHAR
+                filter_options VARCHAR,
+                ai_chart_data JSONB
+            
             )
         """)
         conn.commit()
@@ -806,40 +808,78 @@ def save_data():
         conn = connect_to_db()
         cur = conn.cursor()
         chart_heading_json = json.dumps(data.get('chart_heading'))
-        cur.execute("""
-            INSERT INTO new_dashboard_details_new (
-                User_id,
-                company_name,                
-                chart_name,
-                database_name,
-                selected_table,
-                x_axis,
-                y_axis,
-                aggregate,
-                chart_type,
-                chart_color,
-                chart_heading,
-                drilldown_chart_color,
-                filter_options
-            ) VALUES (
-                %s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-            )
-        """, (
-            data.get('user_id'),
-            data.get('company_name'),       
-            data.get('saveName'),  
-            data.get('databaseName'),
-            data.get('selectedTable'),
-            data.get('xAxis'),
-            data.get('yAxis'),
-            data.get('aggregate'),
-            data.get('chartType'),
-            data.get('chartColor'),
-            chart_heading_json,
-            data.get('drillDownChartColor'),
-            data.get('filterOptions')
-        ))
+        # cur.execute("""
+        #     INSERT INTO new_dashboard_details_new (
+        #         User_id,
+        #         company_name,                
+        #         chart_name,
+        #         database_name,
+        #         selected_table,
+        #         x_axis,
+        #         y_axis,
+        #         aggregate,
+        #         chart_type,
+        #         chart_color,
+        #         chart_heading,
+        #         drilldown_chart_color,
+        #         filter_options,
+        #         ai_chart_data
+        #     ) VALUES (
+        #         %s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s
+        #     )
+        # """, (
+        #     data.get('user_id'),
+        #     data.get('company_name'),       
+        #     data.get('saveName'),  
+        #     data.get('databaseName'),
+        #     data.get('selectedTable'),
+        #     data.get('xAxis'),
+        #     data.get('yAxis'),
+        #     data.get('aggregate'),
+        #     data.get('chartType'),
+        #     data.get('chartColor'),
+        #     chart_heading_json,
+        #     data.get('drillDownChartColor'),
+        #     data.get('filterOptions'),
+        #     data.get('ai_chart_data')
+        # ))
         
+        # conn.commit()
+        cur.execute("""
+        INSERT INTO new_dashboard_details_new (
+            user_id,
+            company_name,                
+            chart_name,
+            database_name,
+            selected_table,
+            x_axis,
+            y_axis,
+            aggregate,
+            chart_type,
+            chart_color,
+            chart_heading,
+            drilldown_chart_color,
+            filter_options,
+            ai_chart_data
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        )
+    """, (
+        data.get('user_id'),
+        data.get('company_name'),       
+        data.get('saveName'),  
+        data.get('databaseName'),
+        data.get('selectedTable'),
+        data.get('xAxis'),  # Ensure this is a Python list for VARCHAR[]
+        data.get('yAxis'),  # Ensure this is a Python list for VARCHAR[]
+        data.get('aggregate'),
+        data.get('chartType'),
+        data.get('chartColor'),
+        chart_heading_json,  # Ensure this variable contains valid JSON if needed
+        data.get('drillDownChartColor'),
+        data.get('filterOptions'),
+        json.dumps(data.get('ai_chart_data'))  # Serialize ai_chart_data as JSON
+    ))
         conn.commit()
         cur.close()
         conn.close()
@@ -1382,6 +1422,7 @@ def receive_chart_details():
     chart_heading = data.get('chart_heading')
     filter_options = data.get('filter_options').split(', ')  # Convert filter_options string to a list
     databaseName = data.get('databaseName')
+    # ai_ml_charts_details = 
 
     print("chart_id====================", chart_id)
     print("tableName====================", tableName)
@@ -1405,6 +1446,7 @@ def receive_chart_details():
     try:
         # Get the database connection
         connection = get_db_connection_view(databaseName)
+        masterdatabasecon=get_db_connection()
         df = fetch_chart_data(connection, tableName)
         print(df.head())
 
@@ -1429,6 +1471,30 @@ def receive_chart_details():
                 print(f"Error processing singleValueChart: {e}")
                 connection.close()
                 return jsonify({"message": "Error processing single value chart", "error": str(e)}), 500
+        if chart_type == 'AiCharts':
+            # try:
+            #     df = fetch_ai_saved_chart_data(connection, tableName)
+            #     print("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+            #     print(df.head())
+            #     ai_ml_charts_details = analyze_data(df)
+            #     connection.close()
+            #     print("AI/ML chart details:", ai_ml_charts_details)
+            #     return jsonify({
+            #         "histogram_details": ai_ml_charts_details,
+            #     }), 200
+            # except Exception as e:
+            #     print("Error while processing chart:", e)
+            #     return jsonify({"error": "An error occurred while generating the chart."}), 500
+            try:
+                
+                df = fetch_ai_saved_chart_data(masterdatabasecon, tableName="new_dashboard_details_new",chart_id=chart_id)
+                print("AI/ML chart details:", df)
+                return jsonify({
+                    "histogram_details": df,
+                }), 200
+            except Exception as e:
+                print("Error while processing chart:", e)
+                return jsonify({"error": "An error occurred while generating the chart."}), 500
         if chart_type == 'sampleAitestChart':
             try:
                 df = fetch_chart_data(connection, tableName)
