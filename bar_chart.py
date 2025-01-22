@@ -115,12 +115,22 @@ def remove_symbols(value):
 #         print("Error: Unable to connect to the database.")
 #         print(e)
 #         return {'numeric_columns': [], 'text_columns': []}
+
+
+
+
 def get_column_names(db_name, username, password, table_name, host, port='5432'):
-    global global_df
+    global global_df    
     oldtablename = getattr(get_column_names, 'oldtablename', None)
     
     if oldtablename == table_name and global_df is not None:
         print("Using cached data from global_df")
+    # if force_refresh or oldtablename != table_name:
+    #     print("Refreshing data cache...")
+    #     global_df = None
+    #     get_column_names.oldtablename = None
+
+    # if global_df is not None:
         
         numeric_columns = global_df.select_dtypes(include=[float, int]).columns.tolist()
         text_columns = global_df.select_dtypes(include=[object]).columns.tolist()
@@ -166,10 +176,6 @@ def get_column_names(db_name, username, password, table_name, host, port='5432')
         df = pd.DataFrame(data, columns=column_names)
         global_df = df
         get_column_names.oldtablename = table_name  # Update the oldtablename to the current table_name
-        # print("============================database data frame============================")
-        # print(global_df.head(5))
-        # print("========================================================")
-
         print("All column names in the dataframe:")
         print(df.columns.tolist())
 

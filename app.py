@@ -199,6 +199,12 @@ def get_table_names():
 @app.route('/column_names/<table_name>',methods=['GET'] )
 def get_columns(table_name):
     db_nameeee= request.args.get('databaseName')
+    # forceRefresh = request.args.get('forceRefresh', 'false').lower() == 'true'
+    # if forceRefresh:
+    #     print("Forcing cache refresh.")
+    #     global global_df
+    #     global_df = None
+    #     get_column_names.oldtablename = None
     column_names = get_column_names(db_nameeee, username, password, table_name, host, port)
     print("column_names====================",column_names)
     return jsonify(column_names)
@@ -436,7 +442,7 @@ def get_table_data():
 @app.route('/plot_chart', methods=['POST', 'GET'])
 def get_bar_chart_route():
     df = bc.global_df
-    df_json = df.to_json(orient='split')  # Convert the DataFrame to JSON
+  # Convert the DataFrame to JSON
     data = request.json
 
     table_name = data['selectedTable']
@@ -447,6 +453,19 @@ def get_bar_chart_route():
     db_nameeee = data['databaseName']
     # selectedUser=data['selectedUser']
     chart_data=data['chartType']
+
+    connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+    database_con = psycopg2.connect(connection_path)
+    new_df=fetch_chart_data(database_con, table_name)
+    print("new_df====================", new_df)
+    if df.equals(new_df):
+        print("Both DataFrames are equal")
+    else:
+        
+        print("DataFrames are not equal")
+        bc.global_df = new_df
+    df_json = df.to_json(orient='split')
+    # print(new_df)
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
