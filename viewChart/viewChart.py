@@ -303,3 +303,40 @@ def filter_chart_data(database_name, table_name, x_axis, y_axis, aggregate, clic
             cursor.close()
         if connection:
             connection.close()
+
+import json
+# from psycopg2 import sql
+
+def fetch_ai_saved_chart_data(connection, tableName, chart_id):
+    try:
+        cursor = connection.cursor()
+
+        # Safely construct the query to fetch data from the dynamic table
+        query = sql.SQL(
+            "SELECT ai_chart_data FROM {table} WHERE id = %s"
+        ).format(
+            table=sql.Identifier(tableName)  # Safely handle dynamic table names
+        )
+
+        # Execute the query with the parameterized chart_id
+        cursor.execute(query, (chart_id,))
+        results = cursor.fetchall()
+
+        # Process results: Deserialize JSON if stored as JSON
+        chart_data = []
+        for record in results:
+            ai_chart_data = record[0]
+            if isinstance(ai_chart_data, list):
+                ai_chart_data = json.dumps(ai_chart_data)  # Convert list to JSON string
+            chart_data.append(json.loads(ai_chart_data))
+
+        return chart_data
+
+    except Exception as e:
+        # Use logging for better error tracking
+        print("Error fetching AI chart data:", e)
+        return None
+
+    finally:
+        # Ensure cursor is closed
+        cursor.close()

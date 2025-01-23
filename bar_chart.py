@@ -400,7 +400,7 @@ def fetch_external_db_connection(db_name,selectedUser):
     
 #     return result
 def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name, selectedUser):
-    global global_df
+    global_df =None
 
     if global_df is None:
         print("Fetching data from the database...")
@@ -981,7 +981,7 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py,selectedUser):
     # conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
     # cur = conn.cursor()
     # if selectedUser == None:
-    if selectedUser in (None, 'null', '(None,)'):
+    if not selectedUser or selectedUser.lower() == 'null':
     # Handle local database connection
 
         conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")

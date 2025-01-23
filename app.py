@@ -33,7 +33,7 @@ import uuid
 
 
 from psycopg2 import sql
-from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data
+from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data,fetch_ai_saved_chart_data
 import pandas as pd
 from flask import jsonify, request
 
@@ -205,15 +205,15 @@ def get_columns(table_name):
     db_name= request.args.get('databaseName')
     connectionType= request.args.get('connectionType')
     selectedUser=request.args.get('selectedUser')
-    forceRefresh = request.args.get('forceRefresh', 'false').lower() == 'true'
+    # forceRefresh = request.args.get('forceRefresh', 'false').lower() == 'true'
     print(f"Request Parameters - Database: {db_name}, Connection Type: {connectionType}, User: {selectedUser}")
 
-    # Clear the cache if forceRefresh is true
-    if forceRefresh:
-        print("Forcing cache refresh.")
-        global global_df
-        global_df = None
-        get_column_names.oldtablename = None
+    # # Clear the cache if forceRefresh is true
+    # if forceRefresh:
+    #     print("Forcing cache refresh.")
+    #     global global_df
+    #     global_df = None
+    #     get_column_names.oldtablename = None
     print("connectionType",connectionType)
     column_names = get_column_names(db_name, username, password, table_name,selectedUser, host, port,connectionType)
     print("column_names====================",column_names)
@@ -264,17 +264,58 @@ def get_bar_chart_route():
     
     df = bc.global_df
     
-    df_json = df.to_json(orient='split')  # Convert the DataFrame to JSON
+    # df_json = df.to_json(orient='split')  # Convert the DataFrame to JSON
     data = request.json
-
+    print("data",data)
     table_name = data['selectedTable']
     x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
     y_axis_columns = data['yAxis']  # Assuming yAxis can be multiple columns as well
     aggregation = data['aggregate']
     checked_option = data['filterOptions']
     db_nameeee = data['databaseName']
-    selectedUser=data['selectedUser']
+    selectedUser = data['selectedUser']
     chart_data=data['chartType']
+    if not selectedUser or selectedUser.lower() == 'null':
+        print("Using default database connection...")
+        connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+    else:
+        print(f"Using connection for user: {selectedUser}")
+        connection_string = fetch_external_db_connection(db_name,selectedUser)
+        if not connection_string:
+            raise Exception("Unable to fetch external database connection details.")
+
+        db_details = {
+                    "host": connection_string[3],
+                    "database": connection_string[7],
+                    "user": connection_string[4],
+                    "password": connection_string[5],
+                    "port": int(connection_string[6])
+        }
+
+        connection_path = f"dbname={db_details['database']} user={db_details['user']} password={db_details['password']} host={db_details['host']} port={db_details['port']}"
+
+        # connection_path = psycopg2.connect(
+        #             dbname=db_details['database'],
+        #             user=db_details['user'],
+        #             password=db_details['password'],
+        #             host=db_details['host'],
+        #             port=db_details['port']
+        # )
+
+    # connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+    database_con = psycopg2.connect(connection_path)
+    print("database_con",connection_path)
+    new_df=fetch_chart_data(database_con, table_name)
+    print("new_df====================", new_df)
+
+    if df.equals(new_df):
+        print("Both DataFrames are equal")
+    else:
+        
+        print("DataFrames are not equal")
+        bc.global_df = new_df
+    df_json = df.to_json(orient='split')
+
     print("df",df)
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
@@ -718,6 +759,7 @@ def create_table():
                 chart_heading VARCHAR,
                 drilldown_chart_color VARCHAR,
                 filter_options VARCHAR,
+                ai_chart_data JSONB,
                 selectedUser VARCHAR
             )
         """)
@@ -761,9 +803,10 @@ def save_data():
                 chart_heading,
                 drilldown_chart_color,
                 filter_options,
+                ai_chart_data,
                 selectedUser
             ) VALUES (
-                %s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s
+                %s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s,%s
             )
         """, (
             data.get('user_id'),
@@ -779,6 +822,7 @@ def save_data():
             chart_heading_json,
             data.get('drillDownChartColor'),
             data.get('filterOptions'),
+            json.dumps(data.get('ai_chart_data')),  # Serialize ai_chart_data as JSON
             data.get('selectedUser')
         ))
         
@@ -1232,6 +1276,39 @@ def login():
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
 
+# @app.route('/api/singlevalue_text_chart', methods=['POST'])
+# def receive_single_value_chart_data():
+#     data = request.get_json()
+#     print("data====================",data)
+#     chart_id=data.get('chart_id')
+#     x_axis = data.get('text_y_xis')[0]
+#     databaseName = data.get('text_y_database')
+#     table_Name = data.get('text_y_table')
+#     selectedUser=data.get("selectedUser")
+#     print("table_Name====================",table_Name)
+#     print("selectedUser====================",selectedUser)
+#     aggregate=data.get('text_y_aggregate')
+#     print("x_axis====================",x_axis)  
+#     print("databaseName====================",databaseName)  
+#     print("table_Name====================",table_Name)
+#     print("aggregate====================",aggregate)
+#     aggregate_py = {
+#                     'count': 'count',
+#                     'sum': 'sum',
+#                     'average': 'mean',
+#                     'minimum': 'min',
+#                     'maximum': 'max'
+#                 }.get(aggregate, 'sum') 
+#     fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate_py,selectedUser)
+#     print("Fetched Data:", fetched_data)
+#     print(f"Received x_axis: {x_axis}")
+#     print(f"Received databaseName: {databaseName}")
+#     print(f"Received table_Name: {table_Name}")
+#     print(f"aggregate====================",{aggregate})
+#     return jsonify({"data": fetched_data,
+#                     "chart_id": chart_id,
+#                      "message": "Data received successfully!"})
+
 @app.route('/api/singlevalue_text_chart', methods=['POST'])
 def receive_single_value_chart_data():
     data = request.get_json()
@@ -1242,7 +1319,6 @@ def receive_single_value_chart_data():
     table_Name = data.get('text_y_table')
     selectedUser=data.get("selectedUser")
     print("table_Name====================",table_Name)
-    print("selectedUser====================",selectedUser)
     aggregate=data.get('text_y_aggregate')
     print("x_axis====================",x_axis)  
     print("databaseName====================",databaseName)  
@@ -1251,7 +1327,7 @@ def receive_single_value_chart_data():
     aggregate_py = {
                     'count': 'count',
                     'sum': 'sum',
-                    'average': 'mean',
+                    'average': 'avg',
                     'minimum': 'min',
                     'maximum': 'max'
                 }.get(aggregate, 'sum') 
@@ -1531,6 +1607,30 @@ def receive_chart_details():
                 print(f"Error processing singleValueChart: {e}")
                 connection.close()
                 return jsonify({"message": "Error processing single value chart", "error": str(e)}), 500
+        if chart_type == 'AiCharts':
+            # try:
+            #     df = fetch_ai_saved_chart_data(connection, tableName)
+            #     print("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+            #     print(df.head())
+            #     ai_ml_charts_details = analyze_data(df)
+            #     connection.close()
+            #     print("AI/ML chart details:", ai_ml_charts_details)
+            #     return jsonify({
+            #         "histogram_details": ai_ml_charts_details,
+            #     }), 200
+            # except Exception as e:
+            #     print("Error while processing chart:", e)
+            #     return jsonify({"error": "An error occurred while generating the chart."}), 500
+            try:
+                masterdatabasecon=get_db_connection()
+                df = fetch_ai_saved_chart_data(masterdatabasecon, tableName="new_dashboard_details_new",chart_id=chart_id)
+                print("AI/ML chart details:", df)
+                return jsonify({
+                    "histogram_details": df,
+                }), 200
+            except Exception as e:
+                print("Error while processing chart:", e)
+                return jsonify({"error": "An error occurred while generating the chart."}), 500
         if chart_type == 'sampleAitestChart':
             try:
                 df = fetch_chart_data(connection, tableName)
@@ -3096,6 +3196,31 @@ def boxplot_data():
 
 
 
+# @app.route('/api/checkSaveName', methods=['POST'])
+# def check_save_name():
+#     data = request.get_json()
+#     save_name = data.get('saveName')
+
+#     if not save_name:
+#         return jsonify({'error': 'Save name is required'}), 400
+
+#     try:
+#         conn = get_db_connection()
+#         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+#         # Query to check if saveName exists
+#         query = "SELECT COUNT(*) FROM new_dashboard_details_new WHERE chart_name = %s"
+#         cursor.execute(query, (save_name,))
+#         exists = cursor.fetchone()[0] > 0
+
+#         cursor.close()
+#         conn.close()
+
+#         return jsonify({'exists': exists})
+#     except Exception as e:
+#         print("Error checking save name:", e)
+#         return jsonify({'error': 'Database error'}), 500
+        
 @app.route('/api/checkSaveName', methods=['POST'])
 def check_save_name():
     data = request.get_json()
@@ -3110,8 +3235,13 @@ def check_save_name():
 
         # Query to check if saveName exists
         query = "SELECT COUNT(*) FROM new_dashboard_details_new WHERE chart_name = %s"
-        cursor.execute(query, (save_name,))
-        exists = cursor.fetchone()[0] > 0
+        try:
+            cursor.execute(query, (save_name,))
+            exists = cursor.fetchone()[0] > 0
+        except psycopg2.errors.UndefinedTable:
+            # Handle the case where the table does not exist
+            print("Table 'new_dashboard_details_new' does not exist.")
+            exists = False
 
         cursor.close()
         conn.close()
@@ -3120,7 +3250,7 @@ def check_save_name():
     except Exception as e:
         print("Error checking save name:", e)
         return jsonify({'error': 'Database error'}), 500
-        
+
 
 
 @app.route('/check_filename/<fileName>', methods=['GET'])
