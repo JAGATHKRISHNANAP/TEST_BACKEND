@@ -280,7 +280,7 @@ def get_bar_chart_route():
         connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
     else:
         print(f"Using connection for user: {selectedUser}")
-        connection_string = fetch_external_db_connection(db_name,selectedUser)
+        connection_string = fetch_external_db_connection(db_nameeee,selectedUser)
         if not connection_string:
             raise Exception("Unable to fetch external database connection details.")
 

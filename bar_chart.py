@@ -857,6 +857,76 @@ def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
     cur.close()
     conn.close()
     return rows
+# from psycopg2 import sql
+
+# def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
+#     print("selectedUser:", selectedUser)
+
+#     # Connect to the appropriate database based on connection_type
+#     if not selectedUser or selectedUser.lower() == 'null':
+#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+#     else:  # External connection
+#         connection_details = fetch_external_db_connection(db_name, selectedUser)
+#         if connection_details:
+#             db_details = {
+#                 "host": connection_details[3],
+#                 "database": connection_details[7],
+#                 "user": connection_details[4],
+#                 "password": connection_details[5],
+#                 "port": int(connection_details[6])
+#             }
+#         if not connection_details:
+#             raise Exception("Unable to fetch external database connection details.")
+
+#         conn = psycopg2.connect(
+#             dbname=db_details['database'],
+#             user=db_details['user'],
+#             password=db_details['password'],
+#             host=db_details['host'],
+#             port=db_details['port'],
+#         )
+
+#     cur = conn.cursor()
+
+#     # Split x_axis_columns into a list of column names
+#     column_list = x_axis_columns.split(',')
+#     result = {}
+
+#     for column_name in column_list:
+#         column_name = column_name.strip()
+
+#         # Get the column type
+#         type_query = sql.SQL(
+#             "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
+#         )
+#         type_check_query = type_query.format(
+#             table=sql.Literal(table_name),
+#             col=sql.Literal(column_name)
+#         )
+#         cur.execute(type_check_query)
+#         column_type = cur.fetchone()
+
+#         # Dynamically build the query based on the column type
+#         if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
+#             # Use TO_CHAR for date or timestamp columns
+#             query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
+#         else:
+#             # Directly fetch the column value for other data types
+#             query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
+        
+#         formatted_query = query.format(
+#             col=sql.Identifier(column_name),
+#             table=sql.Identifier(table_name)
+#         )
+        
+#         cur.execute(formatted_query)
+#         rows = [row[0] for row in cur.fetchall()]  # Fetch and flatten the result
+#         result[column_name] = rows  # Add the column data to the result dictionary
+
+#     cur.close()
+#     conn.close()
+#     return result
+
     # query = f"SELECT {x_axis_columns} FROM {table_name} GROUP BY {x_axis_columns}"
     # print("querty",query)
     # cur.execute(query)
