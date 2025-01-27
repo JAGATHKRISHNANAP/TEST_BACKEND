@@ -3273,6 +3273,118 @@ def check_filename(fileName):
         return jsonify({'error': 'Internal Server Error'}), 500
 
 
+
+import bcrypt
+import binascii
+
+
+
+@app.route('/api/validate_user', methods=['GET'])
+def validate_user():
+    email = request.args.get('email')
+    password = request.args.get('password')
+    company = request.args.get('company')  # Assuming the company is passed in the query params
+    print("Password received:", password)
+    
+    if not email or not password or not company:
+        return jsonify({"message": "Email, password, and company are required"}), 400
+
+    cursor = None
+    conn = None
+    try:
+        # Connect to the company's database
+        conn = get_company_db_connection(company)
+        cursor = conn.cursor()
+
+        # Check if the user exists in the employee list
+        cursor.execute("SELECT password FROM employee_list WHERE LOWER(email) = LOWER(%s)", (email,))
+        hashed_password_row = cursor.fetchone()
+
+        # If no user is found, return an error
+        if not hashed_password_row:
+            return jsonify({"message": "User not found", "isValid": False}), 404
+
+        # Extract the stored hash
+        stored_hash_with_hex = hashed_password_row[0]  # Get the hashed password from the result
+        print("Stored hash in DB (hex format):", stored_hash_with_hex)
+
+        # If the password is stored in hex format, convert it to bytes
+        if stored_hash_with_hex.startswith('\\x'):
+            stored_hash_bytes = binascii.unhexlify(stored_hash_with_hex[2:])
+        else:
+            stored_hash_bytes = stored_hash_with_hex.encode('utf-8')
+
+        print("Decoded stored hash (bytes):", stored_hash_bytes)
+
+        # Compare the plaintext password with the stored hashed password
+        # if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
+        #     return jsonify({"isValid": True})
+
+        # return jsonify({"isValid": False, "message": "Incorrect password"})
+        if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
+            print("Password matched successfully!")
+            return jsonify({"isValid": True})
+
+        print("Password mismatch!")
+        return jsonify({"isValid": False, "message": "Incorrect password"})
+
+    
+    except Exception as e:
+        print(f"Error validating user: {e}")
+        return jsonify({"message": "Internal server error"}), 500
+    finally:
+        if cursor:  # Ensure cursor exists before closing
+            cursor.close()
+        if conn:  # Ensure connection exists before closing
+            conn.close()
+
+
+
+def create_roles_table():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS role (
+            role_id SERIAL PRIMARY KEY,
+            role_name VARCHAR(255) UNIQUE NOT NULL,
+            permissions VARCHAR(255)
+        );
+        """
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+@app.route('/updateroles', methods=['POST'])
+def add_role():
+    try:
+        create_roles_table()
+        data = request.json
+        role_name = data['role_name']
+        permissions = data['permissions']  # Expect permissions as a list
+
+        # Convert list to comma-separated string
+        permissions_str = ', '.join(permissions)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO role (role_name, permissions)
+            VALUES (%s, %s)
+            ON CONFLICT (role_name) DO NOTHING;
+            """,
+            (role_name, permissions_str)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"message": "Role added successfully"}), 201
+
+    except Exception as e:
+        logging.error(f"Error adding role: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True)
-   
