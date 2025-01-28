@@ -760,7 +760,12 @@ def create_table():
                 drilldown_chart_color VARCHAR,
                 filter_options VARCHAR,
                 ai_chart_data JSONB,
-                selectedUser VARCHAR
+                selectedUser VARCHAR,
+                xFontSize INTEGER,
+                fontStyle VARCHAR,         
+                categoryColor VARCHAR,      
+                yFontSize INTEGER,          
+                valueColor VARCHAR  
             )
         """)
         conn.commit()
@@ -775,7 +780,7 @@ def save_data():
     data = request.json
     user_id=data['user_id']
     save_name= data['saveName']
-    company_name=data['company_name']   \
+    company_name=data['company_name']   
     
     print("company_name====================",company_name)  
     print("user_id====================",user_id)
@@ -804,9 +809,14 @@ def save_data():
                 drilldown_chart_color,
                 filter_options,
                 ai_chart_data,
-                selectedUser
-            ) VALUES (
-                %s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s,%s
+                selectedUser,
+                xFontSize,          
+                fontStyle,          
+                categoryColor,      
+                yFontSize,          
+                valueColor
+            )VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
         """, (
             data.get('user_id'),
@@ -823,7 +833,12 @@ def save_data():
             data.get('drillDownChartColor'),
             data.get('filterOptions'),
             json.dumps(data.get('ai_chart_data')),  # Serialize ai_chart_data as JSON
-            data.get('selectedUser')
+            data.get('selectedUser'),
+            data.get('xFontSize'),
+            data.get('fontStyle'),
+            data.get('categoryColor'),
+            data.get('yFontSize'),
+            data.get('valueColor')
         ))
         
         conn.commit()
@@ -1013,7 +1028,7 @@ def get_chart_data(chart_name):
     if conn:
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, selected_table, x_axis, y_axis, aggregate, chart_type, chart_color, chart_heading, drilldown_chart_color, filter_options, database_name ,selecteduser FROM new_dashboard_details_new WHERE chart_name = %s", (chart_name,))
+            cursor.execute("SELECT id, selected_table, x_axis, y_axis, aggregate, chart_type, chart_color, chart_heading, drilldown_chart_color, filter_options, database_name ,selecteduser, xFontSize,fontStyle,categoryColor, yFontSize,valueColor FROM new_dashboard_details_new WHERE chart_name = %s", (chart_name,))
             data = cursor.fetchone()
             print("data",data)
             if data is None:
@@ -3279,56 +3294,125 @@ import binascii
 
 
 
+# @app.route('/api/validate_user', methods=['GET'])
+# def validate_user():
+#     email = request.args.get('email')
+#     password = request.args.get('password')
+#     company = request.args.get('company')  # Assuming the company is passed in the query params
+#     print("Password received:", password)
+    
+#     if not email or not password or not company:
+#         return jsonify({"message": "Email, password, and company are required"}), 400
+
+#     cursor = None
+#     conn = None
+#     try:
+#         # Connect to the company's database
+#         conn = get_company_db_connection(company)
+#         cursor = conn.cursor()
+
+#         # Check if the user exists in the employee list
+#         cursor.execute("SELECT password FROM employee_list WHERE LOWER(email) = LOWER(%s)", (email,))
+#         hashed_password_row = cursor.fetchone()
+
+#         # If no user is found, return an error
+#         if not hashed_password_row:
+#             return jsonify({"message": "User not found", "isValid": False}), 404
+
+#         # Extract the stored hash
+#         stored_hash_with_hex = hashed_password_row[0]  # Get the hashed password from the result
+#         print("Stored hash in DB (hex format):", stored_hash_with_hex)
+
+#         # If the password is stored in hex format, convert it to bytes
+#         if stored_hash_with_hex.startswith('\\x'):
+#             stored_hash_bytes = binascii.unhexlify(stored_hash_with_hex[2:])
+#         else:
+#             stored_hash_bytes = stored_hash_with_hex.encode('utf-8')
+
+#         print("Decoded stored hash (bytes):", stored_hash_bytes)
+
+#         # Compare the plaintext password with the stored hashed password
+#         # if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
+#         #     return jsonify({"isValid": True})
+
+#         # return jsonify({"isValid": False, "message": "Incorrect password"})
+#         if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
+#             print("Password matched successfully!")
+#             return jsonify({"isValid": True})
+
+#         print("Password mismatch!")
+#         return jsonify({"isValid": False, "message": "Incorrect password"})
+
+    
+#     except Exception as e:
+#         print(f"Error validating user: {e}")
+#         return jsonify({"message": "Internal server error"}), 500
+#     finally:
+#         if cursor:  # Ensure cursor exists before closing
+#             cursor.close()
+#         if conn:  # Ensure connection exists before closing
+#             conn.close()
+
+
 @app.route('/api/validate_user', methods=['GET'])
 def validate_user():
     email = request.args.get('email')
     password = request.args.get('password')
-    company = request.args.get('company')  # Assuming the company is passed in the query params
+    company = request.args.get('company')  # The company is passed in the query params
     print("Password received:", password)
     
-    if not email or not password or not company:
-        return jsonify({"message": "Email, password, and company are required"}), 400
+    if not email or not password:
+        return jsonify({"message": "Email and password are required"}), 400
 
     cursor = None
     conn = None
     try:
-        # Connect to the company's database
-        conn = get_company_db_connection(company)
+        # Check if company is None or "null" string and connect accordingly
+        if company is None or company.lower() == 'null':  # Check for 'null' string
+            conn = get_db_connection()  # Fallback to default database
+        else:
+            conn = get_company_db_connection(company)
+            
         cursor = conn.cursor()
 
-        # Check if the user exists in the employee list
-        cursor.execute("SELECT password FROM employee_list WHERE LOWER(email) = LOWER(%s)", (email,))
+        # Use the appropriate table based on the database being queried
+        table_name =  "organizationdatatest" if company is None or company.lower() == 'null' else "employee_list"
+
+        # Check if the user exists in the appropriate table
+        cursor.execute(f"SELECT password FROM {table_name} WHERE LOWER(email) = LOWER(%s)", (email,))
         hashed_password_row = cursor.fetchone()
 
         # If no user is found, return an error
         if not hashed_password_row:
             return jsonify({"message": "User not found", "isValid": False}), 404
 
-        # Extract the stored hash
-        stored_hash_with_hex = hashed_password_row[0]  # Get the hashed password from the result
-        print("Stored hash in DB (hex format):", stored_hash_with_hex)
+        # Extract the stored password
+        stored_password = hashed_password_row[0]  # Get the stored password from the result
+        print("Stored password in DB:", stored_password)
 
-        # If the password is stored in hex format, convert it to bytes
-        if stored_hash_with_hex.startswith('\\x'):
-            stored_hash_bytes = binascii.unhexlify(stored_hash_with_hex[2:])
-        else:
-            stored_hash_bytes = stored_hash_with_hex.encode('utf-8')
+        if company is None or company.lower() == 'null':  # If company is None or 'null', use plain text comparison
+            if stored_password == password:
+                print("Password matched successfully!")
+                return jsonify({"isValid": True})
+            else:
+                print("Password mismatch!")
+                return jsonify({"isValid": False, "message": "Incorrect password"})
+        else:  # If company is provided, use bcrypt to compare hashed password
+            # If the password is stored in hex format, convert it to bytes
+            if stored_password.startswith('\\x'):
+                stored_hash_bytes = binascii.unhexlify(stored_password[2:])
+            else:
+                stored_hash_bytes = stored_password.encode('utf-8')
 
-        print("Decoded stored hash (bytes):", stored_hash_bytes)
+            print("Decoded stored hash (bytes):", stored_hash_bytes)
 
-        # Compare the plaintext password with the stored hashed password
-        # if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
-        #     return jsonify({"isValid": True})
+            if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
+                print("Password matched successfully!")
+                return jsonify({"isValid": True})
 
-        # return jsonify({"isValid": False, "message": "Incorrect password"})
-        if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
-            print("Password matched successfully!")
-            return jsonify({"isValid": True})
+            print("Password mismatch!")
+            return jsonify({"isValid": False, "message": "Incorrect password"})
 
-        print("Password mismatch!")
-        return jsonify({"isValid": False, "message": "Incorrect password"})
-
-    
     except Exception as e:
         print(f"Error validating user: {e}")
         return jsonify({"message": "Internal server error"}), 500
