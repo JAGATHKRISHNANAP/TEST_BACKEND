@@ -873,7 +873,12 @@ def update_data():
                 chart_color = %s,
                 chart_heading = %s,
                 drilldown_chart_color = %s,
-                filter_options = %s
+                filter_options = %s,
+                xFontSize= %s,         
+                fontStyle= %s,          
+                categoryColor= %s,   
+                yFontSize= %s,          
+                valueColor= %s   
             WHERE
                 id = %s
         """, (
@@ -887,7 +892,13 @@ def update_data():
             chart_heading_json,
             data.get('drillDownChartColor'),
             data.get('filterOptions'),
-            data.get('chartId')  # Assuming there's an 'id' field in the data
+            # Assuming there's an 'id' field in the data
+            data.get('xFontSize'),
+            data.get('fontStyle'),
+            data.get('categoryColor'),
+            data.get('yFontSize'),
+            data.get('valueColor'),
+            data.get('chartId'), 
         ))
         
 
@@ -1823,8 +1834,9 @@ def dashboard_data(dashboard_name):
     print("chart datas------------------------------------------------------------------------------------------------------------------",data) 
     if data is not None:
         chart_ids = data[4]
+        positions=data[5]
         print("chart_ids====================",chart_ids)    
-        chart_datas=get_dashboard_view_chart_data(chart_ids)
+        chart_datas=get_dashboard_view_chart_data(chart_ids,positions)
         print("dashboarddata",chart_datas)
         # print("chart_datas====================",chart_datas)
         # return jsonify(data,chart_datas)
@@ -3469,6 +3481,53 @@ def add_role():
     except Exception as e:
         logging.error(f"Error adding role: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/update-chart-position', methods=['POST'])
+def update_chart_position():
+    data = request.get_json()
+    chart_ids = data.get('chart_id')
+    positions = data.get('position')
+    print("chart_ids",chart_ids)
+    print("positions",positions)
+    if not chart_ids or not positions or len(chart_ids) != len(positions):
+        return jsonify({"error": "Missing or mismatched chart_ids or positions data"}), 400
+
+    # Connect to the database
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Check if the data already exists in the table
+        cur.execute("SELECT * FROM dashboard_details_wu_id WHERE chart_ids = %s;", (chart_ids,))
+
+        existing_record = cur.fetchone()
+        print("existing_record",existing_record)
+
+        if existing_record:
+            # Update existing record with new positions
+            cur.execute("""
+                UPDATE dashboard_details_wu_id
+                SET position = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE chart_ids = %s;
+            """, (json.dumps(positions), chart_ids))
+        else:
+            # Insert new record if it doesn't exist
+            cur.execute("""
+                INSERT INTO dashboard_details_wu_id (chart_ids, position, created_at, updated_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+            """, (chart_ids, json.dumps(positions)))
+
+        conn.commit()
+        return jsonify({"message": "Chart positions updated successfully"}), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cur.close()
+        conn.close()
+
 
 if __name__ == "__main__":
     app.run(debug=True)

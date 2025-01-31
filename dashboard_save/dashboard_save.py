@@ -230,17 +230,47 @@ def fetch_external_db_connection(database_name,selected_user):
         print(f"Error fetching connection details: {e}")
         return None
 
-def get_dashboard_view_chart_data(chart_ids):
+def get_dashboard_view_chart_data(chart_ids,positions):
     conn = create_connection()  # Initial connection to your main database
     if conn:
         try:
+            # if isinstance(chart_ids, str):
+            #     import ast
+            #     chart_ids = ast.literal_eval(chart_ids)  # Convert string representation of list to actual list
+            # # sorted_chart_ids = sorted(chart_ids, key=lambda x: list(chart_ids).index(x))
+
+            # chart_positions = {chart_id: position for chart_id, position in zip(chart_ids, positions)}
+            
+            # # Sort chart_ids based on the positions provided
+            # sorted_chart_ids = sorted(chart_ids, key=lambda x: (chart_positions.get(x, {'x': 0, 'y': 0})['x'], chart_positions.get(x, {'x': 0, 'y': 0})['y']))
+
             if isinstance(chart_ids, str):
                 import ast
                 chart_ids = ast.literal_eval(chart_ids)  # Convert string representation of list to actual list
+            
+            # Convert chart_ids to a list if it's a set
+            if isinstance(chart_ids, set):
+                chart_ids = list(chart_ids)
+
+            # Ensure positions is a list of dictionaries
+            if isinstance(positions, str):
+                positions = ast.literal_eval(positions)  # If positions are passed as a string, convert it to list of dicts
+
+            # Create a dictionary for chart ids and their positions
+            chart_positions = {chart_id: position for chart_id, position in zip(chart_ids, positions)}
+            
+            # Check if all positions are in the correct format
+            for chart_id, position in chart_positions.items():
+                if not isinstance(position, dict) or 'x' not in position or 'y' not in position:
+                    print(f"Invalid position for chart_id {chart_id}: {position}")
+                    return []
+
+            # Sort chart_ids based on the positions provided
+            sorted_chart_ids = sorted(chart_ids, key=lambda x: (chart_positions.get(x, {'x': 0, 'y': 0})['x'], chart_positions.get(x, {'x': 0, 'y': 0})['y']))
 
             chart_data_list = []
             print("chart_data_list",chart_data_list)
-            for chart_id in chart_ids:
+            for chart_id in sorted_chart_ids:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, database_name, selected_table, x_axis, y_axis, aggregate, chart_type, filter_options, chart_heading, chart_color, selectedUser FROM new_dashboard_details_new WHERE id = %s", (chart_id,))
                 chart_data = cursor.fetchone()
