@@ -434,8 +434,28 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                         })
                         continue  # Skip further processing for this chart ID
 
+                    
+                    if chart_type == "treeHierarchy":
+                        # No grouping or transformation needed for this chart type
+                        filtered_categories = []
+                        filtered_values = []
+                        print("No grouping or conversion for treeHierarchy chart type.")
+                        
+                        connection.close()  # Ensure DB connection is closed
+                        dataframe_dict = df.to_dict(orient='records')  # Convert DataFrame to JSON
+                        print("df_json====================", dataframe_dict)
+
+                        return jsonify({
+                            "message": "Chart details received successfully!",
+                            "categories": filtered_categories,
+                            "values": filtered_values,
+                            "chart_type": chart_type,
+                            "chart_heading": chart_heading,
+                            "x_axis": x_axis,
+                            "data_frame": dataframe_dict,
+                        }), 200
                     # Handle dual y_axis columns
-                    elif len(y_axis) == 2:
+                    elif chart_type == "duealChart":
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
                         print("Grouped DataFrame (dual y-axis):", grouped_df.head())
 
@@ -467,26 +487,6 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             "y_axis": y_axis,
                             "aggregate": aggregate
                         })
-                    if chart_type == "treeHierarchy":
-                        # No grouping or transformation needed for this chart type
-                        filtered_categories = []
-                        filtered_values = []
-                        print("No grouping or conversion for treeHierarchy chart type.")
-                        
-                        connection.close()  # Ensure DB connection is closed
-                        dataframe_dict = df.to_dict(orient='records')  # Convert DataFrame to JSON
-                        print("df_json====================", dataframe_dict)
-
-                        return jsonify({
-                            "message": "Chart details received successfully!",
-                            "categories": filtered_categories,
-                            "values": filtered_values,
-                            "chart_type": chart_type,
-                            "chart_heading": chart_heading,
-                            "x_axis": x_axis,
-                            "data_frame": dataframe_dict,
-                        }), 200
-
                     else:
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
                         print("Grouped DataFrame:", grouped_df.head())

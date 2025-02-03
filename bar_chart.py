@@ -1188,7 +1188,7 @@ def fetch_hierarchical_data(table_name, db_name,selectedUser):
         try:
             # conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
             # cur = conn.cursor()
-            if selectedUser == 'null':
+            if not selectedUser or selectedUser.lower() == 'null':
                 conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
             else:  # External connection
                 connection_details = fetch_external_db_connection(db_name,selectedUser)

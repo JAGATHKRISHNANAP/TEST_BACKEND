@@ -2226,6 +2226,53 @@ def get_predictions():
 
 
 
+# @app.route('/Hierarchial-backend-endpoint', methods=['POST', 'GET'])
+# def handle_hierarchical_bar_click():
+#     global global_df
+
+#     if request.method == 'POST':
+#         data = request.json
+#         print("Received request data:", data)
+
+#         clicked_category = data.get('category')
+#         x_axis_columns = data.get('xAxis')
+#         y_axis_column = data.get('yAxis')
+#         table_name = data.get('tableName')
+#         db_name = data.get('databaseName')
+#         current_depth = data.get('currentLevel', 0)
+#         selectedUser=data.get("selectedUser")
+#         print("Clicked Category:", clicked_category)
+#         print("X-axis Columns:", x_axis_columns)
+
+#         try:
+#             print(global_df)
+#             if global_df is None:
+#                 global_df = fetch_hierarchical_data(table_name, db_name,selectedUser)
+#                 print("Fetched data:", global_df.head() if global_df is not None else "No data returned")
+
+#             if global_df is None or global_df.empty:
+#                 return jsonify({"error": "Data could not be loaded into global_df."}), 500
+
+#             if y_axis_column[0] not in global_df.columns:
+#                 return jsonify({"error": f"Column {y_axis_column[0]} not found in global_df."}), 500
+            
+#             global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+#             drill_down_result = Hierarchial_drill_down(
+#                 clicked_category=clicked_category, 
+#                 x_axis_columns=x_axis_columns, 
+#                 y_axis_column=y_axis_column, 
+#                 depth=current_depth, 
+#                 aggregation=data.get('aggregation')
+#             )
+#             return jsonify(drill_down_result)
+
+#         except Exception as e:
+#             print("An error occurred in handle_hierarchical_bar_click:", str(e))
+#             return jsonify({"error": "An internal error occurred.", "message": str(e)}), 500
+
+
+
+
 @app.route('/Hierarchial-backend-endpoint', methods=['POST', 'GET'])
 def handle_hierarchical_bar_click():
     global global_df
@@ -2245,7 +2292,6 @@ def handle_hierarchical_bar_click():
         print("X-axis Columns:", x_axis_columns)
 
         try:
-            print(global_df)
             if global_df is None:
                 global_df = fetch_hierarchical_data(table_name, db_name,selectedUser)
                 print("Fetched data:", global_df.head() if global_df is not None else "No data returned")
@@ -2264,14 +2310,12 @@ def handle_hierarchical_bar_click():
                 depth=current_depth, 
                 aggregation=data.get('aggregation')
             )
+            print("Drill-down result:", drill_down_result)
             return jsonify(drill_down_result)
 
         except Exception as e:
             print("An error occurred in handle_hierarchical_bar_click:", str(e))
             return jsonify({"error": "An internal error occurred.", "message": str(e)}), 500
-
-
-
 
 @app.route('/nlp_upload_audio', methods=['POST'])
 def nlp_upload_audio():
@@ -2399,7 +2443,8 @@ def delete_dashboard_name():
     
     except Exception as e:
         print("Error while deleting chart:", e)
-        return jsonify({"error": "Failed to delete chart"}), 500
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+
 
 
 
