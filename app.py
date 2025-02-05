@@ -27,6 +27,9 @@ from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_
 from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
 from ai_charts import analyze_data
 
+from flask_socketio import SocketIO, emit
+
+
 
 
 company_name_global = None
@@ -42,6 +45,8 @@ app.secret_key = secret_key
 # CORS(app,resources={r"/*": {"origins": "http://localhost:3000"}}) 
 CORS(app, resources={r"/*": {"origins": "*"}})
 # CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+# socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 db_name = DB_NAME
 username = USER_NAME
@@ -199,12 +204,6 @@ def get_table_names():
 @app.route('/column_names/<table_name>',methods=['GET'] )
 def get_columns(table_name):
     db_nameeee= request.args.get('databaseName')
-    # forceRefresh = request.args.get('forceRefresh', 'false').lower() == 'true'
-    # if forceRefresh:
-    #     print("Forcing cache refresh.")
-    #     global global_df
-    #     global_df = None
-    #     get_column_names.oldtablename = None
     column_names = get_column_names(db_nameeee, username, password, table_name, host, port)
     print("column_names====================",column_names)
     return jsonify(column_names)
@@ -439,6 +438,208 @@ def get_table_data():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import threading
+DB_CONFIG = {
+    'user': 'postgres',
+    'password': 'jaTHU@12',
+    'host': 'localhost',
+    'port': 5432
+}
+
+active_listeners = {}  # Store active listener threads
+def create_dynamic_trigger(db_nameeee, table_name):
+    """Dynamically create a trigger and function for real-time updates."""
+    try:
+        connection = psycopg2.connect(dbname=db_nameeee, **DB_CONFIG)
+        cursor = connection.cursor()
+        function_name = f"notify_chart_update_{table_name}"
+        trigger_name = f"chart_update_trigger_{table_name}"
+        cursor.execute(f"""
+            CREATE OR REPLACE FUNCTION {function_name}()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                PERFORM pg_notify('chart_update', '{table_name}');
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """)
+        cursor.execute(f"SELECT tgname FROM pg_trigger WHERE tgname = '{trigger_name}';")
+        trigger_exists = cursor.fetchone()
+        if not trigger_exists:
+            cursor.execute(f"""
+                CREATE TRIGGER {trigger_name}
+                AFTER INSERT OR UPDATE OR DELETE ON {table_name}
+                FOR EACH ROW EXECUTE FUNCTION {function_name}();
+            """)
+        connection.commit()
+        cursor.close()
+        connection.close()
+        print(f"Trigger and function created for {db_nameeee}.{table_name}")
+    except Exception as e:
+        print(f"Error creating trigger: {e}")
+
+def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,chartType):
+    """Continuously listen for updates with current parameters"""
+    if not isinstance(x_axis_columns, list):
+        x_axis_columns = [x_axis_columns]
+    if not isinstance(y_axis_columns, list):
+        y_axis_columns = [y_axis_columns]
+    print("Listening for updates...")
+    print("X-Axis Columns:", x_axis_columns)
+    print("Y-Axis Columns:", y_axis_columns)
+    thread = threading.current_thread()
+    try:
+        connection = psycopg2.connect(dbname=db_nameeee, **DB_CONFIG)
+        connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = connection.cursor()
+        cursor.execute("LISTEN chart_update;")
+        print(f"Listening with params: {db_nameeee}.{table_name} ({x_axis_columns}, {y_axis_columns})")
+
+        while getattr(thread, "do_run", True):  # Check if the thread should stop
+            connection.poll()
+            while connection.notifies:
+                notify = connection.notifies.pop(0)
+                if notify.payload == table_name:
+                    if chartType == "duealbarChart":
+                        print("duealAxis=============duealAxis===================duealAxis========duealAxis")
+                    else:
+                        updated_data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+                        socketio.emit("chart_update", {
+                                    "data": updated_data,  # Wrap list in a key
+                                    "xaxis": x_axis_columns,
+                                    "yaxis": y_axis_columns
+                                })
+
+    except Exception as e:
+        print(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        print(f"Listener error: {repr(e)}")  # Better error output
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# @app.route('/plot_chart', methods=['POST', 'GET'])
+# def get_bar_chart_route():
+#     df = bc.global_df
+#   # Convert the DataFrame to JSON
+#     data = request.json
+
+#     table_name = data['selectedTable']
+#     x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
+#     y_axis_columns = data['yAxis']  # Assuming yAxis can be multiple columns as well
+#     aggregation = data['aggregate']
+#     checked_option = data['filterOptions']
+#     db_nameeee = data['databaseName']
+#     df_json = df.to_json(orient='split')
+#     if not db_nameeee or not table_name:
+#         return jsonify({"error": "Database name and table name required"}), 400
+#     create_dynamic_trigger(db_nameeee, table_name)
+ 
+#     if len(y_axis_columns) == 1:
+#         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+        
+#         if aggregation == "count":
+#             print("Data for count aggregation:", data)
+#             array1 = [item[0] for item in data]
+#             array2 = [item[1] for item in data]
+#             print("Array1:", array1)
+#             print("Array2:", array2)
+            
+#             # Return the JSON response for count aggregation
+#             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
+        
+#         # For other aggregation types
+#         categories = {}
+#         for row in data:
+#             category = tuple(row[:-1])
+#             y_axis_value = row[-1]
+#             if category not in categories:
+#                 categories[category] = initial_value(aggregation)
+#             update_category(categories, category, y_axis_value, aggregation)
+
+#         labels = [', '.join(category) for category in categories.keys()]
+#         values = list(categories.values())
+#         print("labels====================", labels)
+#         print("values====================", values)
+        
+#         # Return the JSON response for other aggregations
+#         return jsonify({"categories": labels, "values": values, "aggregation": aggregation, "dataframe": df_json})
+
+
+
+@socketio.on("connect")
+def handle_connect():
+    """Handle connections with parameter validation"""
+    params = request.args
+    required = ['selectedTable', 'xAxis', 'filterOptions','yAxis', 'aggregate', 'databaseName','chartType']
+
+    missing = [key for key in required if not params.get(key)]
+    if missing:
+        print(f"Missing parameters: {missing}")
+        return
+    
+    key = tuple(params.get(key) for key in required)
+    print("+++++++++++++++++++++++++++++",key)
+
+    # Stop previous listener with same parameters
+    if key in active_listeners:
+        print(f"Stopping existing listener for {key}")
+        del active_listeners[key]
+
+    # Create new listener with current parameters
+    listener = threading.Thread(
+        target=listen_to_db,
+        args=key,
+        daemon=True
+    )
+    listener.start()
+    active_listeners[key] = listener
+    print(f"New listener started for {key}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @app.route('/plot_chart', methods=['POST', 'GET'])
 def get_bar_chart_route():
     df = bc.global_df
@@ -453,18 +654,23 @@ def get_bar_chart_route():
     db_nameeee = data['databaseName']
     # selectedUser=data['selectedUser']
     chart_data=data['chartType']
-
-    connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
-    database_con = psycopg2.connect(connection_path)
-    new_df=fetch_chart_data(database_con, table_name)
-    print("new_df====================", new_df)
-    if df.equals(new_df):
-        print("Both DataFrames are equal")
-    else:
-        
-        print("DataFrames are not equal")
-        bc.global_df = new_df
     df_json = df.to_json(orient='split')
+    if not db_nameeee or not table_name:
+        return jsonify({"error": "Database name and table name required"}), 400
+    create_dynamic_trigger(db_nameeee, table_name)
+ 
+
+    # connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
+    # database_con = psycopg2.connect(connection_path)
+    # new_df=fetch_chart_data(database_con, table_name)
+    # print("new_df====================", new_df)
+    # if df.equals(new_df):
+    #     print("Both DataFrames are equal")
+    # else:
+        
+    #     print("DataFrames are not equal")
+    #     bc.global_df = new_df
+    # df_json = df.to_json(orient='split')
     # print(new_df)
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
@@ -494,13 +700,7 @@ def get_bar_chart_route():
             
             categories = [row[0] for row in data]  # Words
             values = [row[1] for row in data]     # Counts
-            
-            # return jsonify({
-            #     "categories": categories,
-            #     "values": values,
-            #     "chartType": "wordCloud",
-            #     "dataframe": df_json
-            # })
+        
             data = {
             "categories" : [row[0] for row in data],  # Words
             "values" : [row[1] for row in data],     #
@@ -2432,12 +2632,14 @@ def api_get_table_columns(table_name):
 
 
 
-# PUSH DATE 17-12-2024
 
+
+# if __name__ == "__main__":
+#     app.run(debug=True, host='0.0.0.0', port=5000)
+#     # app.run(debug=True)
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
-    # app.run(debug=True)
-
+    # Use socketio.run to enable WebSocket support
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
 
 

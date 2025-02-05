@@ -13,6 +13,8 @@ from sqlalchemy import create_engine
 
 global_df = None  # Ensure global_df is initialized to None
 
+global_column_df =None
+
 def is_numeric(value):
     try:
         float(value)
@@ -27,113 +29,14 @@ def remove_symbols(value):
 
 
 
-# def get_column_names(db_name, username, password, table_name, host='localhost', port='5432'):
-#     global global_df
-#     oldtablename = getattr(get_column_names, 'oldtablename', None)
-    
-#     if oldtablename == table_name and global_df is not None:
-#         print("Using cached data from global_df")
-        
-#         numeric_columns = global_df.select_dtypes(include=[float, int]).columns.tolist()
-#         text_columns = global_df.select_dtypes(include=[object]).columns.tolist()
-
-#         numeric_columns_cleaned = {}
-#         text_columns_cleaned = {}
-
-#         for column_name in numeric_columns:
-#             cleaned_values = global_df[column_name].apply(remove_symbols).tolist()
-#             numeric_columns_cleaned[column_name] = cleaned_values
-#             num_columns = list(numeric_columns_cleaned.keys())
-#             print("numeric columns", num_columns)
-
-#         for column_name in text_columns:
-#             cleaned_values = global_df[column_name].apply(remove_symbols).tolist()
-#             text_columns_cleaned[column_name] = cleaned_values
-#             txt_columns = list(text_columns_cleaned.keys())
-
-#             print("test columns", txt_columns)  
-
-#         return {
-#             'numeric_columns': num_columns,
-#             'text_columns': txt_columns
-#         }
-    
-#     try:
-#         conn = psycopg2.connect(
-#             dbname=db_name,
-#             user=username,
-#             password=password,
-#             host=host,
-#             port=port
-#         )
-#         cursor = conn.cursor()
-#         cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")  # Get the column names without fetching data
-#         column_names = [desc[0] for desc in cursor.description]
-
-#         cursor.execute(f"SELECT * FROM {table_name}")
-#         data = cursor.fetchall()
-#         df = pd.DataFrame(data, columns=column_names)
-#         global_df = df
-#         get_column_names.oldtablename = table_name  # Update the oldtablename to the current table_name
-#         print("============================database data frame============================")
-#         print(global_df.head(5))
-#         print("========================================================")
-
-#         print("All column names in the dataframe:")
-#         print(df.columns.tolist())
-
-#         for column in df.columns:
-#             df[column] = pd.to_numeric(df[column], errors='ignore')
-
-#         numeric_columns = df.select_dtypes(include=[float, int]).columns.tolist()
-#         text_columns = df.select_dtypes(include=[object]).columns.tolist()
-
-#         numeric_columns_cleaned = {}
-#         text_columns_cleaned = {}
-
-#         for column_name in numeric_columns:
-#             cleaned_values = df[column_name].apply(remove_symbols).tolist()
-#             numeric_columns_cleaned[column_name] = cleaned_values
-#             num_columns = list(numeric_columns_cleaned.keys())
-#             print("numeric columns", num_columns)
-
-#         for column_name in text_columns:
-#             cleaned_values = df[column_name].apply(remove_symbols).tolist()
-#             text_columns_cleaned[column_name] = cleaned_values
-#             txt_columns = list(text_columns_cleaned.keys())
-#             print("test columns", txt_columns)
-
-#         cursor.close()
-#         conn.close()
-
-#         return {
-#             'numeric_columns': num_columns,
-#             'text_columns': txt_columns
-#             # 'dataframe': global_df,
-#         }
-#     except psycopg2.Error as e:
-#         print("Error: Unable to connect to the database.")
-#         print(e)
-#         return {'numeric_columns': [], 'text_columns': []}
-
-
-
-
 def get_column_names(db_name, username, password, table_name, host, port='5432'):
-    global global_df    
+    global global_df ,global_column_df
     oldtablename = getattr(get_column_names, 'oldtablename', None)
     
-    if oldtablename == table_name and global_df is not None:
-        print("Using cached data from global_df")
-    # if force_refresh or oldtablename != table_name:
-    #     print("Refreshing data cache...")
-    #     global_df = None
-    #     get_column_names.oldtablename = None
-
-    # if global_df is not None:
-        
-        numeric_columns = global_df.select_dtypes(include=[float, int]).columns.tolist()
-        text_columns = global_df.select_dtypes(include=[object]).columns.tolist()
+    if oldtablename == table_name and global_column_df is not None:
+        print("Using cached data from global_column_df")
+        numeric_columns = global_column_df.select_dtypes(include=[float, int]).columns.tolist()
+        text_columns = global_column_df.select_dtypes(include=[object]).columns.tolist()
 
         numeric_columns_cleaned = {}
         text_columns_cleaned = {}
@@ -142,13 +45,13 @@ def get_column_names(db_name, username, password, table_name, host, port='5432')
         txt_columns = []  # Initialize with a default value
 
         for column_name in numeric_columns:
-            cleaned_values = global_df[column_name].apply(remove_symbols).tolist()
+            cleaned_values = global_column_df[column_name].apply(remove_symbols).tolist()
             numeric_columns_cleaned[column_name] = cleaned_values
             num_columns = list(numeric_columns_cleaned.keys())
             print("numeric columns", num_columns)
 
         for column_name in text_columns:
-            cleaned_values = global_df[column_name].apply(remove_symbols).tolist()
+            cleaned_values = global_column_df[column_name].apply(remove_symbols).tolist()
             text_columns_cleaned[column_name] = cleaned_values
             txt_columns = list(text_columns_cleaned.keys())
 
@@ -174,6 +77,7 @@ def get_column_names(db_name, username, password, table_name, host, port='5432')
         cursor.execute(f"SELECT * FROM {table_name}")
         data = cursor.fetchall()
         df = pd.DataFrame(data, columns=column_names)
+        global_column_df=df
         global_df = df
         get_column_names.oldtablename = table_name  # Update the oldtablename to the current table_name
         print("All column names in the dataframe:")
@@ -215,6 +119,43 @@ def get_column_names(db_name, username, password, table_name, host, port='5432')
         print(e)
         return {'numeric_columns': [], 'text_columns': []}
 
+# def get_column_names(db_name, username, password, table_name, host, port='5432'):
+#     global global_df    
+#     oldtablename = getattr(get_column_names, 'oldtablename', None)
+    
+#     if oldtablename == table_name and global_df is not None:
+#         print("Using cached data from global_df")
+#         numeric_columns = global_df.select_dtypes(include=[float, int]).columns.tolist()
+#         text_columns = global_df.select_dtypes(include=[object]).columns.tolist()
+#         return {'numeric_columns': numeric_columns, 'text_columns': text_columns}
+
+#     try:
+#         conn = psycopg2.connect(
+#             dbname=db_name,
+#             user=username,
+#             password=password,
+#             host=host,
+#             port=port
+#         )
+#         cursor = conn.cursor()
+#         cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+#         column_names = [desc[0] for desc in cursor.description]
+#         cursor.execute(f"SELECT * FROM {table_name}")
+#         data = cursor.fetchall()
+#         df = pd.DataFrame(data, columns=column_names)
+#         global_df = df
+#         get_column_names.oldtablename = table_name
+
+#         cursor.close()
+#         conn.close()
+
+#         numeric_columns = df.select_dtypes(include=[float, int]).columns.tolist()
+#         text_columns = df.select_dtypes(include=[object]).columns.tolist()
+#         return {'numeric_columns': numeric_columns, 'text_columns': text_columns}
+#     except psycopg2.Error as e:
+#         print("Error: Unable to connect to the database.")
+#         print(e)
+#         return {'numeric_columns': [], 'text_columns': []}
 
 
 def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
@@ -317,170 +258,57 @@ def count_function(table_name, x_axis_columns, checked_option, y_axis_column, ag
     return result
 
 
-# def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
-#     global global_df
-#     print("table_name:", table_name)
-#     print("x_axis_columns:", x_axis_columns)
-#     # print("checked_option:", checked_option)
-#     print("y_axis_column:", y_axis_column)
-#     print("aggregation:", aggregation)
-
-#     if global_df is None:
-#         print("Fetching data from the database...")
-#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
-#         cur = conn.cursor()
-#         query = f"SELECT * FROM {table_name}"
-#         cur.execute(query)
-#         data = cur.fetchall()
-#         colnames = [desc[0] for desc in cur.description]
-#         cur.close()
-#         conn.close()
-
-#         global_df = pd.DataFrame(data, columns=colnames)
-#         print("*********************************************************************************",global_df)
-
-#     x_axis_columns_str = x_axis_columns
-#     options = [option.strip() for option in checked_option.split(',')]
-#     filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
-#     print("filtered_df:", filtered_df)  
-    
-#     # Perform aggregation based on the selected aggregation type
-#     if aggregation == "sum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
-#     elif aggregation == "average":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
-#     elif aggregation == "count":
-
-#         # Check initial data
-#         print("Filtered DataFrame shape:", filtered_df.shape)
-#         print("Null count in y_axis_column[0]:", filtered_df[y_axis_column[0]].isnull().sum())
-
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0]).size().reset_index(name="count")
-
-        
-#     elif aggregation == "maximum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].max().reset_index()
-#     elif aggregation == "minimum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].min().reset_index()
-#     else:
-#         raise ValueError(f"Unsupported aggregation type: {aggregation}")
-
-#     # Convert the result to a list of tuples for easy output
-#     result = [tuple(x) for x in grouped_df.to_numpy()]
-#     print("result:", result)
-#     return result
 
 
-# def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
-#     global global_df
-#     print("table_name:", table_name)
-#     print("x_axis_columns:", x_axis_columns)
-#     print("y_axis_column:", y_axis_column)
-#     print("aggregation:", aggregation)
-
-#     if global_df is None:
-#         print("Fetching data from the database...")
-#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
-#         cur = conn.cursor()
-#         query = f"SELECT * FROM {table_name}"
-#         cur.execute(query)
-#         data = cur.fetchall()
-#         colnames = [desc[0] for desc in cur.description]
-#         cur.close()
-#         conn.close()
-
-#         global_df = pd.DataFrame(data, columns=colnames)
-#         print("*********************************************************************************", global_df)
-
-#     # Convert the x_axis_columns values to strings
-#     for col in x_axis_columns:
-#         if col in global_df.columns:
-#             global_df[col] = global_df[col].astype(str)
-
-#     x_axis_columns_str = x_axis_columns
-#     options = [option.strip() for option in checked_option.split(',')]
-
-#     # Convert options to strings for comparison
-#     options = list(map(str, options))
-
-#     # Filter the DataFrame based on the x_axis_columns values
-#     filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
-#     print("filtered_df:", filtered_df)  
-    
-#     # Perform aggregation based on the selected aggregation type
-#     if aggregation == "sum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
-#     elif aggregation == "average":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
-#     elif aggregation == "count":
-#         # Check initial data
-#         print("Filtered DataFrame shape:", filtered_df.shape)
-#         print("Null count in y_axis_column[0]:", filtered_df[y_axis_column[0]].isnull().sum())
-
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0]).size().reset_index(name="count")
-#     elif aggregation == "maximum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].max().reset_index()
-#     elif aggregation == "minimum":
-#         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].min().reset_index()
-#     else:
-#         raise ValueError(f"Unsupported aggregation type: {aggregation}")
-
-#     # Convert the result to a list of tuples for easy output
-#     result = [tuple(x) for x in grouped_df.to_numpy()]
-#     print("result:", result)
-#     return result
 
 
+
+
+
+
+
+
+
+DB_CONFIG = {
+    'user': 'postgres',
+    'password': 'jaTHU@12',
+    'host': 'localhost',
+    'port': 5432
+}
 
 def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
+    print("                         data below                      ")
+    print("                                               ")
+    print(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name)
+    print("                                               ")
+    print("                         data above                     ")
     global global_df
-    print("table_name:", table_name)
-    print("x_axis_columns:", x_axis_columns)
-    print("y_axis_column:", y_axis_column)
-    print("aggregation:", aggregation)
+    # if global_df is None:
+    print("Fetching data from the database...")
+    conn = psycopg2.connect(dbname=db_name, **DB_CONFIG)
+    cur = conn.cursor()
+    query = f"SELECT * FROM {table_name}"
+    cur.execute(query)
+    data = cur.fetchall()
+    colnames = [desc[0] for desc in cur.description]
+    cur.close()
+    conn.close()
+    global_df = pd.DataFrame(data, columns=colnames)
 
-    if global_df is None:
-        print("Fetching data from the database...")
-        conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
-        cur = conn.cursor()
-        query = f"SELECT * FROM {table_name}"
-        cur.execute(query)
-        data = cur.fetchall()
-        colnames = [desc[0] for desc in cur.description]
-        cur.close()
-        conn.close()
-
-        global_df = pd.DataFrame(data, columns=colnames)
-        print("*********************************************************************************", global_df)
-
-    # Create a copy of the necessary data for processing
     temp_df = global_df.copy()
-
-    # Convert the x_axis_columns values to strings in the temporary DataFrame
     for col in x_axis_columns:
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str)
-
     x_axis_columns_str = x_axis_columns
     options = [option.strip() for option in checked_option.split(',')]
-
-    # Convert options to strings for comparison
     options = list(map(str, options))
-
-    # Filter the DataFrame based on the x_axis_columns values
     filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
-    print("filtered_df:", filtered_df)  
     
-    # Perform aggregation based on the selected aggregation type
     if aggregation == "sum":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
     elif aggregation == "average":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
     elif aggregation == "count":
-        # Check initial data
-        print("Filtered DataFrame shape:", filtered_df.shape)
-        print("Null count in y_axis_column[0]:", filtered_df[y_axis_column[0]].isnull().sum())
-
         grouped_df = filtered_df.groupby(x_axis_columns_str[0]).size().reset_index(name="count")
     elif aggregation == "maximum":
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].max().reset_index()
@@ -488,13 +316,9 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].min().reset_index()
     else:
         raise ValueError(f"Unsupported aggregation type: {aggregation}")
-
-    # Convert the result to a list of tuples for easy output
+    
     result = [tuple(x) for x in grouped_df.to_numpy()]
-    print("result:", result)
     return result
-
-
 
 # def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
 #     global global_df
@@ -513,45 +337,30 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
 #         colnames = [desc[0] for desc in cur.description]
 #         cur.close()
 #         conn.close()
-
 #         global_df = pd.DataFrame(data, columns=colnames)
+#         print("*********************************************************************************", global_df)
+#     # Create a copy of the necessary data for processing
 #     temp_df = global_df.copy()
-
 #     # Convert the x_axis_columns values to strings in the temporary DataFrame
 #     for col in x_axis_columns:
 #         if col in temp_df.columns:
 #             temp_df[col] = temp_df[col].astype(str)
-
 #     x_axis_columns_str = x_axis_columns
 #     options = [option.strip() for option in checked_option.split(',')]
-#     print("options----------+**********+---------:", options)
 #     # Convert options to strings for comparison
 #     options = list(map(str, options))
-#     print("options----------+++++++---------:", options)
-
-#     print("temp_df:", temp_df[x_axis_columns[0]])
-#     formatted_dates = temp_df[x_axis_columns[0]].apply(
-#     lambda date_str: datetime.strptime(date_str, '%Y-%m-%d').strftime('%a, %d %b %Y 00:00:00 GMT')
-# )
-#     print("temp_df------:", formatted_dates)
-
-
 #     # Filter the DataFrame based on the x_axis_columns values
 #     filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
-#     # print("filtered_df:-------****---------", filtered_df)
-    
+#     print("filtered_df:", filtered_df)  
 #     # Perform aggregation based on the selected aggregation type
 #     if aggregation == "sum":
 #         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].sum().reset_index()
-#         # print("grouped_df---------------sum:", grouped_df)
 #     elif aggregation == "average":
 #         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].mean().reset_index()
-#         # print("grouped_df---------------average:", grouped_df)
 #     elif aggregation == "count":
 #         # Check initial data
 #         print("Filtered DataFrame shape:", filtered_df.shape)
 #         print("Null count in y_axis_column[0]:", filtered_df[y_axis_column[0]].isnull().sum())
-
 #         grouped_df = filtered_df.groupby(x_axis_columns_str[0]).size().reset_index(name="count")
 #     elif aggregation == "maximum":
 #         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].max().reset_index()
@@ -559,11 +368,54 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
 #         grouped_df = filtered_df.groupby(x_axis_columns_str[0])[y_axis_column[0]].min().reset_index()
 #     else:
 #         raise ValueError(f"Unsupported aggregation type: {aggregation}")
-
 #     # Convert the result to a list of tuples for easy output
 #     result = [tuple(x) for x in grouped_df.to_numpy()]
-#     # print("result:", result)
+#     print("result:", result)
 #     return result
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
