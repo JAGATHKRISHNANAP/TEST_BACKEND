@@ -288,7 +288,7 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                     filter_options = chart_data[7]
                     chart_color = chart_data[9]  # Assuming chart_color is a list
                     selected_user = chart_data[10]  # Extract the selectedUser field
-
+                
                     # Determine the aggregation function
                     aggregate_py = {
                         'count': 'count',
@@ -351,6 +351,7 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                                         "values": values,
                                         "chart_type": chart_type,
                                         "chart_heading": chart_heading,
+                                        "positions": chart_positions.get(chart_id)
                                     })
                                     continue
                                 else:
@@ -376,7 +377,8 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             "chart_id": chart_id,
                             "chart_type": chart_type,
                             "chart_heading": chart_heading,
-                            "value": single_value_result
+                            "value": single_value_result,
+                            "positions": chart_positions.get(chart_id)
                         })
                         continue  # Skip further processing for this chart ID
 
@@ -430,7 +432,8 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             "chart_color": chart_color,
                             "x_axis": x_axis,
                             "y_axis": y_axis,
-                            "aggregate": aggregate
+                            "aggregate": aggregate,
+                            "positions": chart_positions.get(chart_id)
                         })
                         continue  # Skip further processing for this chart ID
 
@@ -453,6 +456,7 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             "chart_heading": chart_heading,
                             "x_axis": x_axis,
                             "data_frame": dataframe_dict,
+                            "positions": chart_positions.get(chart_id)
                         }), 200
                     # Handle dual y_axis columns
                     elif chart_type == "duealChart":
@@ -485,7 +489,8 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             "chart_type": chart_type,
                             "x_axis": x_axis,
                             "y_axis": y_axis,
-                            "aggregate": aggregate
+                            "aggregate": aggregate,
+                            "positions": chart_positions.get(chart_id)
                         })
                     else:
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
@@ -513,7 +518,8 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             "chart_color": chart_color,
                             "x_axis": x_axis,
                             "y_axis": y_axis,
-                            "aggregate": aggregate
+                            "aggregate": aggregate,
+                            "positions": chart_positions.get(chart_id)
                         })
 
             conn.close()  # Close the main connection

@@ -1842,7 +1842,8 @@ def dashboard_data(dashboard_name):
         # return jsonify(data,chart_datas)
         return jsonify({
             "data": data,
-            "chart_datas": chart_datas
+            "chart_datas": chart_datas,
+            "positions": positions
         })
     else:
         return jsonify({'error': 'Failed to fetch data for Chart {}'.format(dashboard_name)})
@@ -3330,7 +3331,7 @@ def check_filename(fileName):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
+        create_dashboard_table(conn)
         # Query to check if the file name exists
         query = "SELECT COUNT(*) FROM dashboard_details_wu_id WHERE file_name = %s"
         cursor.execute(query, (fileName,))
