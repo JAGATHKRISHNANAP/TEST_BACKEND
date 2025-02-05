@@ -592,9 +592,10 @@ def get_edit_chart_route():
     elif len(y_axis_columns) == 2:
         datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         data = {
-            "categories": [row[0] for row in datass],
+             "categories": [row[0] for row in datass],
             "series1": [row[1] for row in datass],
-            "series2": [row[2] for row in datass]
+            "series2": [row[2] for row in datass],
+            "aggregation": aggregation
         }
         print("data====================", data)
         
@@ -1096,6 +1097,8 @@ def save_all_chart_details():
     data = request.get_json()
     user_id=data['user_id']
     charts = data['charts']
+
+    print("charts====================", charts)
     print("user_id====================", user_id)
     dashboardfilterXaxis = data['dashboardfilterXaxis']
     dashboardClickedCategory = data['selectedCategory']
