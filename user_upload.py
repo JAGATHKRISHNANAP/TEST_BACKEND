@@ -676,10 +676,10 @@ from config import PASSWORD, USER_NAME, HOST, PORT
 def get_db_connection(dbname="datasource"):
     return psycopg2.connect(
         dbname=dbname,
-        user="postgres",
-        password="Gayu@123",
-        host="localhost",
-        port="5432"
+        user=USER_NAME,
+        password=PASSWORD,
+        host=HOST,
+        port=PORT
     )
 
 # Handle manual user registration

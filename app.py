@@ -2623,10 +2623,10 @@ def get_table_data():
 
 # Function to create a database connection
 def create_connection( db_name="datasource",
-        user="postgres",
-        password="Gayu@123",
-        host="localhost",
-        port="5432"):
+        user=USER_NAME,
+        password=PASSWORD,
+        host=HOST,
+        port=PORT):
     try:
         conn = psycopg2.connect(
             dbname=db_name,
