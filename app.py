@@ -462,7 +462,7 @@ def get_table_data():
 
 
 
-
+from psycopg2 import sql
 import threading
 DB_CONFIG = {
     'user': 'postgres',
@@ -503,12 +503,18 @@ def create_dynamic_trigger(db_nameeee, table_name):
     except Exception as e:
         print(f"Error creating trigger: {e}")
 
+
+
+
+
 def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,chartType):
     """Continuously listen for updates with current parameters"""
     if not isinstance(x_axis_columns, list):
         x_axis_columns = [x_axis_columns]
+    # if not isinstance(y_axis_columns, list):
+    #     y_axis_columns = [y_axis_columns]
     if not isinstance(y_axis_columns, list):
-        y_axis_columns = [y_axis_columns]
+        y_axis_columns = y_axis_columns.split(",")
     print("Listening for updates...")
     print("X-Axis Columns:", x_axis_columns)
     print("Y-Axis Columns:", y_axis_columns)
@@ -525,8 +531,24 @@ def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, agg
             while connection.notifies:
                 notify = connection.notifies.pop(0)
                 if notify.payload == table_name:
-                    if chartType == "duealbarChart":
+                    if chartType == "singleValueChart":
+                        aggregate_py = {
+                        'count': 'count',
+                        'sum': 'sum',
+                        'average': 'mean',
+                        'minimum': 'min',
+                        'maximum': 'max'
+                    }.get(aggregation, 'sum') 
+                        updated_data = fetchText_data(db_nameeee, table_name, x_axis_columns[0], aggregate_py)
+                        socketio.emit("chart_update", {"data": updated_data})
+                    if len(y_axis_columns) == 2:
                         print("duealAxis=============duealAxis===================duealAxis========duealAxis")
+                        updated_data=fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
+                        socketio.emit("chart_update", {
+                                    "data": updated_data,  # Wrap list in a key
+                                    "xaxis": x_axis_columns,
+                                    "yaxis": y_axis_columns
+                                })
                     else:
                         updated_data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
                         socketio.emit("chart_update", {
@@ -541,6 +563,47 @@ def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, agg
     finally:
         cursor.close()
         connection.close()
+
+# def listen_to_single_Value_db(table_name, x_axis_columns, aggregation, db_nameeee):
+#     """Continuously listen for updates with current parameters"""
+#     if not isinstance(x_axis_columns, list):
+#         x_axis_columns = [x_axis_columns]
+    
+#     print(f"Listening for updates on {db_nameeee}.{table_name} for {x_axis_columns}")
+
+#     thread = threading.current_thread()
+#     try:
+#         connection = psycopg2.connect(dbname=db_nameeee, **DB_CONFIG)
+#         connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+#         cursor = connection.cursor()
+#         cursor.execute("LISTEN chart_update;")
+#         print(f"Successfully listening to chart_update on {table_name}")
+
+#         while getattr(thread, "do_run", True):  # Check if the thread should stop
+#             connection.poll()
+#             while connection.notifies:
+#                 notify = connection.notifies.pop(0)
+#                 print(f"Received notification: {notify.payload}")  # Debugging line
+#                 if notify.payload == table_name:
+#                     aggregate_py = {
+#                         'count': 'count',
+#                         'sum': 'sum',
+#                         'average': 'mean',
+#                         'minimum': 'min',
+#                         'maximum': 'max'
+#                     }.get(aggregation, 'sum') 
+#                     updated_data = fetchText_data(db_nameeee, table_name, x_axis_columns[0], aggregate_py)
+#                     socketio.emit("chart_update", {"data": updated_data})
+#     except Exception as e:
+#         print(f"Listener error: {repr(e)}")  # Better error output
+#     finally:
+#         cursor.close()
+#         connection.close()
+
+
+
+
+
 
 
 # @app.route('/plot_chart', methods=['POST', 'GET'])
@@ -592,19 +655,111 @@ def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, agg
 
 
 
+# @socketio.on("connect")
+# def handle_connect():
+#     """Handle connections with parameter validation"""
+#     params = request.args
+#     required = ['selectedTable', 'xAxis', 'filterOptions','yAxis', 'aggregate', 'databaseName','chartType']
+
+#     missing = [key for key in required if not params.get(key)]
+#     if missing:
+#         print(f"Missing parameters: {missing}")
+#         return
+    
+#     key = tuple(params.get(key) for key in required)
+#     print("+++++++++++++++++++++++++++++",key)
+
+#     # Stop previous listener with same parameters
+#     if key in active_listeners:
+#         print(f"Stopping existing listener for {key}")
+#         del active_listeners[key]
+
+#     # Create new listener with current parameters
+#     listener = threading.Thread(
+#         target=listen_to_db,
+#         args=key,
+#         daemon=True
+#     )
+#     listener.start()
+#     active_listeners[key] = listener
+#     print(f"New listener started for {key}")
+
+
+
 @socketio.on("connect")
 def handle_connect():
     """Handle connections with parameter validation"""
     params = request.args
-    required = ['selectedTable', 'xAxis', 'filterOptions','yAxis', 'aggregate', 'databaseName','chartType']
+    required = ['selectedTable', 'xAxis', 'filterOptions', 'yAxis', 'aggregate', 'databaseName', 'chartType']
 
     missing = [key for key in required if not params.get(key)]
     if missing:
         print(f"Missing parameters: {missing}")
         return
+
+    chart_type = params.get("chartType")
+    x_axis = params.get("xAxis")
+
+    # Ensure xAxis is not empty
+    x_axis_columns = x_axis.split(",") if x_axis else []
     
-    key = tuple(params.get(key) for key in required)
-    print("+++++++++++++++++++++++++++++",key)
+    if chart_type == "single value chart":
+        # Validate and extract required values
+        if not x_axis_columns or not x_axis_columns[0]:
+            print("Error: xAxis is missing or empty for single value chart")
+            return
+        
+        key = (
+            params.get("databaseName"),
+            params.get("selectedTable"),
+            x_axis_columns[0],  # Ensure the first x-axis column is valid
+            params.get("aggregate"),
+        )
+    else:
+        key = tuple(params.get(key) for key in required)
+
+    print("+++++++++++++++++++++++++++++", key)
+
+    # Stop previous listener with same parameters
+    if key in active_listeners:
+        print(f"Stopping existing listener for {key}")
+        del active_listeners[key]
+
+    # Create new listener with current parameters
+    listener = threading.Thread(
+        target=listen_to_db,
+        args=key,
+        daemon=True
+    )
+    listener.start()
+    active_listeners[key] = listener
+    print(f"New listener started for {key}")
+
+# @socketio.on("connect")
+# def handle_connect():
+    """Handle connections with parameter validation"""
+    params = request.args
+    required = ['selectedTable', 'xAxis', 'filterOptions', 'yAxis', 'aggregate', 'databaseName', 'chartType']
+
+    missing = [key for key in required if not params.get(key)]
+    if missing:
+        print(f"Missing parameters: {missing}")
+        return
+
+    chart_type = params.get("chartType")
+    
+    if chart_type == "single value chart":
+        # Extract required values for single value chart
+        key = (
+            params.get("databaseName"),
+            params.get("selectedTable"),
+            params.get("xAxis").split(",")[0] if params.get("xAxis") else None,  # Get first x-axis column
+            params.get("aggregate"),
+        )
+    else:
+        key = tuple(params.get(key) for key in required)
+
+    print("+++++++++++++++++++++++++++++", key)
 
     # Stop previous listener with same parameters
     if key in active_listeners:
@@ -624,15 +779,49 @@ def handle_connect():
 
 
 
+# @socketio.on("connect_single_value_chart")
+# def handle_single_value_connect(data):
+#     """Handle WebSocket connection for single-value charts"""
+#     table_name = data.get("table")
+#     x_axis = data.get("x_axis")
+#     aggregate = data.get("aggregate")
+#     db_name = data.get("database")
 
+#     if not table_name or not x_axis or not aggregate or not db_name:
+#         print("Missing parameters for single-value chart update")
+#         return
 
+#     key = (table_name, x_axis, aggregate, db_name)
 
+#     # if key in active_listeners:
+#     #     print(f"Stopping existing listener for {key}")
+#     #     active_listeners[key].do_run = False  # Stop the existing thread
+#     #     del active_listeners[key]
 
+#     # listener = threading.Thread(
+#     #     target=listen_to_single_Value_db,
+#     #     args=(table_name, [x_axis], aggregate, db_name),
+#     #     daemon=True
+#     # )
+#     # listener.start()
+#     # active_listeners[key] = listener
+#     # print(f"New listener started for {key}")
+#     print("+++++++++++++++++++++++++++++",key)
 
+#     # Stop previous listener with same parameters
+#     if key in active_listeners:
+#         print(f"Stopping existing listener for {key}")
+#         del active_listeners[key]
 
-
-
-
+#     # Create new listener with current parameters
+#     listener = threading.Thread(
+#         target=listen_to_single_Value_db,
+#         args=key,
+#         daemon=True
+#     )
+#     listener.start()
+#     active_listeners[key] = listener
+#     print(f"New listener started for {key}")
 
 
 
@@ -645,7 +834,6 @@ def get_bar_chart_route():
     df = bc.global_df
   # Convert the DataFrame to JSON
     data = request.json
-
     table_name = data['selectedTable']
     x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
     y_axis_columns = data['yAxis']  # Assuming yAxis can be multiple columns as well
@@ -672,9 +860,11 @@ def get_bar_chart_route():
     #     bc.global_df = new_df
     # df_json = df.to_json(orient='split')
     # print(new_df)
+    print("xaxis column__________________",x_axis_columns)
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
+    print("chart type=================",chart_data)
     if len(y_axis_columns) == 0 and chart_data == "wordCloud": 
         # Handle WordCloud scenario
         
@@ -711,6 +901,27 @@ def get_bar_chart_route():
         except Exception as e:
             print("Error executing WordCloud query:", e)
             return jsonify({"error": str(e)})
+        
+    if chart_data=="singleValueChart":
+        print("++++++++singleValueChart+++++++_________________singleValueChart_____________________singleValueChart_____________________singleValueChart_____________________________+++++++++++singleValueChart+++++++++++++++++++++++++++")
+        create_dynamic_trigger(db_nameeee, table_name
+                           )
+        aggregate_py = {
+                        'count': 'count',
+                        'sum': 'sum',
+                        'average': 'mean',
+                        'minimum': 'min',
+                        'maximum': 'max'
+                    }.get(aggregation, 'sum') 
+
+        fetched_data = fetchText_data(db_nameeee, table_name, x_axis_columns[0],aggregate_py)
+        print("fetched_data=========",fetched_data)
+        return jsonify({"data": fetched_data,
+                    # "chart_id": chart_id,
+                     "message": "Data received successfully!"})
+    # if chart_data == "singleValueChart":
+    #     return 
+
     
     if len(x_axis_columns) == 2 and chart_data == "duealbarChart":    # Handle dual X-axis scenario
             data = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
@@ -757,8 +968,8 @@ def get_bar_chart_route():
 
         labels = [', '.join(category) for category in categories.keys()]
         values = list(categories.values())
-        print("labels====================", labels)
-        print("values====================", values)
+        # print("labels====================", labels)
+        # print("values====================", values)
         
         # Return the JSON response for other aggregations
         return jsonify({"categories": labels, "values": values, "aggregation": aggregation, "dataframe": df_json})
@@ -766,7 +977,8 @@ def get_bar_chart_route():
 
     elif len(y_axis_columns) == 2:
         datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
-        
+        print("xaxis column__________________",x_axis_columns)
+        print("y_axis_columns====================", y_axis_columns)
         data = {
             "categories": [row[0] for row in datass],
             "series1": [row[1] for row in datass],
@@ -1521,20 +1733,60 @@ def login():
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
 
+# @app.route('/api/singlevalue_text_chart', methods=['POST'])
+# def receive_single_value_chart_data():
+#     data = request.get_json()
+#     print("data====================",data)
+#     chart_id=data.get('chart_id')
+#     x_axis = data.get('text_y_xis')[0]
+#     databaseName = data.get('text_y_database')
+#     table_Name = data.get('text_y_table')
+#     print("table_Name====================",table_Name)
+#     aggregate=data.get('text_y_aggregate')
+#     print("x_axis====================",x_axis)  
+#     print("databaseName====================",)  
+#     print("table_Name====================",table_Name)
+#     print("aggregate====================",aggregate)
+#     create_dynamic_trigger(databaseName, table_Name
+#                            )
+#     aggregate_py = {
+#                     'count': 'count',
+#                     'sum': 'sum',
+#                     'average': 'mean',
+#                     'minimum': 'min',
+#                     'maximum': 'max'
+#                 }.get(aggregate, 'sum') 
+#     fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate_py)
+#     print("Fetched Data:", fetched_data)
+#     print(f"Received x_axis: {x_axis}")
+#     print(f"Received databaseName: {databaseName}")
+#     print(f"Received table_Name: {table_Name}")
+#     print(f"aggregate====================",{aggregate})
+#     return jsonify({"data": fetched_data,
+#                     "chart_id": chart_id,
+#                      "message": "Data received successfully!"})
+
+
+
 @app.route('/api/singlevalue_text_chart', methods=['POST'])
 def receive_single_value_chart_data():
     data = request.get_json()
-    print("data====================",data)
     chart_id=data.get('chart_id')
     x_axis = data.get('text_y_xis')[0]
     databaseName = data.get('text_y_database')
     table_Name = data.get('text_y_table')
-    print("table_Name====================",table_Name)
     aggregate=data.get('text_y_aggregate')
+
     print("x_axis====================",x_axis)  
     print("databaseName====================",databaseName)  
     print("table_Name====================",table_Name)
     print("aggregate====================",aggregate)
+    create_dynamic_trigger(databaseName, table_Name)
+    #                        )
+    if not databaseName or not table_Name:
+        return jsonify({"error": "Database name and table name required"}), 400
+    create_dynamic_trigger(databaseName, table_Name)
+ 
     aggregate_py = {
                     'count': 'count',
                     'sum': 'sum',
@@ -1543,14 +1795,10 @@ def receive_single_value_chart_data():
                     'maximum': 'max'
                 }.get(aggregate, 'sum') 
     fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate_py)
-    print("Fetched Data:", fetched_data)
-    print(f"Received x_axis: {x_axis}")
-    print(f"Received databaseName: {databaseName}")
-    print(f"Received table_Name: {table_Name}")
-    print(f"aggregate====================",{aggregate})
     return jsonify({"data": fetched_data,
                     "chart_id": chart_id,
                      "message": "Data received successfully!"})
+
 
 @app.route('/api/text_chart', methods=['POST'])
 def receive_chart_data():

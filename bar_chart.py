@@ -277,11 +277,11 @@ DB_CONFIG = {
 }
 
 def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name):
-    print("                         data below                      ")
-    print("                                               ")
-    print(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name)
-    print("                                               ")
-    print("                         data above                     ")
+    # print("                         data below                      ")
+    # print("                                               ")
+    # print(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name)
+    # print("                                               ")
+    # print("                         data above                     ")
     global global_df
     # if global_df is None:
     print("Fetching data from the database...")
@@ -606,12 +606,10 @@ def perform_calculation(dataframe, columnName, calculation):
 def fetchText_data(databaseName, table_Name, x_axis, aggregate_py):
     print("aggregate===========================>>>>", aggregate_py)   
     print(table_Name)
-
-
     # Connect to the database
-    conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
+    # conn = psycopg2.connect(f"dbname={databaseName} user={USER_NAME} password={PASSWORD} host={HOST}")
+    conn = psycopg2.connect(dbname=databaseName, **DB_CONFIG)
     cur = conn.cursor()
-
     # Check the data type of the x_axis column
     cur.execute(f"""
         SELECT data_type 
@@ -621,9 +619,6 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py):
     
     column_type = cur.fetchone()[0]
     print("column_type", column_type)  
-
-
-
     if column_type == 'character varying':
         query = f"""
         SELECT {aggregate_py}(DISTINCT {x_axis}) AS total_{x_axis}
@@ -641,22 +636,7 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py):
         query = f"""
         SELECT {aggregate_py}({x_axis}) AS total_{x_axis}
         FROM {table_Name}
-        """
-    
-    
-    # # Use DISTINCT only if the column type is character varying
-    # if column_type == 'character varying':
-    #     query = f"""
-    #     SELECT {aggregate_py}(DISTINCT {x_axis}) AS total_{x_axis}
-    #     FROM {table_Name}
-    #     """
-    #     print("character varying")  
-    # else:
-    #     query = f"""
-    #     SELECT {aggregate_py}({x_axis}) AS total_{x_axis}
-    #     FROM {table_Name}
-    #     """
-
+        """   
     print("Query:", query)
     
     cur.execute(query)
@@ -668,7 +648,6 @@ def fetchText_data(databaseName, table_Name, x_axis, aggregate_py):
 
     # Process the result into a dictionary
     data = {"total_x_axis": result[0]}  # result[0] contains the aggregated value
-
     return data
 
 
