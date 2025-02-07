@@ -229,7 +229,8 @@ def fetch_external_db_connection(database_name,selected_user):
     except Exception as e:
         print(f"Error fetching connection details: {e}")
         return None
-
+import re  
+import ast
 def get_dashboard_view_chart_data(chart_ids,positions):
     conn = create_connection()  # Initial connection to your main database
     if conn:
@@ -243,22 +244,26 @@ def get_dashboard_view_chart_data(chart_ids,positions):
             
             # # Sort chart_ids based on the positions provided
             # sorted_chart_ids = sorted(chart_ids, key=lambda x: (chart_positions.get(x, {'x': 0, 'y': 0})['x'], chart_positions.get(x, {'x': 0, 'y': 0})['y']))
+            print("chart_ids",chart_ids)
+            # if isinstance(chart_ids, str):
+            #     import ast
+            #     # chart_ids = ast.literal_eval(chart_ids)  # Convert string representation of list to actual list
+            #     chart_ids = list(ast.literal_eval(chart_ids))  # Convert set to list to maintain order
 
             if isinstance(chart_ids, str):
-                import ast
-                chart_ids = ast.literal_eval(chart_ids)  # Convert string representation of list to actual list
-            
+                chart_ids = list(map(int, re.findall(r'\d+', chart_ids)))                
+                print("chart_ids",chart_ids)
             # Convert chart_ids to a list if it's a set
-            if isinstance(chart_ids, set):
-                chart_ids = list(chart_ids)
-
+            # if isinstance(chart_ids, set):
+            #     chart_ids = list(chart_ids)
+            #     print("chart_ids",chart_ids)
             # Ensure positions is a list of dictionaries
             if isinstance(positions, str):
                 positions = ast.literal_eval(positions)  # If positions are passed as a string, convert it to list of dicts
 
             # Create a dictionary for chart ids and their positions
-            chart_positions = {chart_id: position for chart_id, position in zip(chart_ids, positions)}
-            
+            chart_positions = {chart_id: positions[idx] for idx, chart_id in enumerate(chart_ids)}
+            print("position",chart_positions)
             # Check if all positions are in the correct format
             for chart_id, position in chart_positions.items():
                 if not isinstance(position, dict) or 'x' not in position or 'y' not in position:
