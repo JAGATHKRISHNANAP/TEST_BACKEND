@@ -833,7 +833,7 @@ def insert_user(cursor, employee_name, role_id, username, email, password, categ
     cursor.execute("SELECT currval(pg_get_serial_sequence('employee_list', 'employee_id'))")
     return cursor.fetchone()[0]
 
-# Handle categories and user permissions
+# Handle categories and user ssions
 def handle_categories(conn_datasource, employee_id, role_id, organization_name, categories):
     for category in categories:
         with conn_datasource.cursor() as cursor:

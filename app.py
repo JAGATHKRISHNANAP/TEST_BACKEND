@@ -2000,7 +2000,7 @@ def fetch_categories():
 
 @app.route('/api/users', methods=['GET'])
 def get_all_users():
-    company_name = request.args.get('')
+    company_name = request.args.get('companyName')
     print("company_name====================",company_name)
     page = int(request.args.get('page', 1))  # Default to page 1 if not provided
     limit = int(request.args.get('limit', 10))  # Default to 10 users per page

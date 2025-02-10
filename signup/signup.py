@@ -175,10 +175,16 @@ def fetch_company_login_data(email, password, company):
     conn = connect_db(company)
     cursor = conn.cursor()
 
+    role_conn = None  # Initialize role_conn outside the try block
+    role_cursor = None # Initialize role_cursor outside the try block
+
     # First query to fetch the user details (except password)
     cursor.execute("SELECT employee_id, employee_name, role_id, email FROM employee_list WHERE email = %s", (email,))
     user = cursor.fetchone()
-
+    print(user)
+    # role_cursor.execute("SELECT role_name FROM role_table WHERE role_id = %s", (role_id,))
+    # role_data = role_cursor.fetchone()
+    
     if user:
         # Second query to fetch the hashed password separately
         cursor.execute("SELECT password FROM employee_list WHERE email = %s", (email,))
@@ -191,6 +197,17 @@ def fetch_company_login_data(email, password, company):
             # Check if the password matches the hashed password
             if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
                 print("Password match!")
+                role_conn = get_db_connection() # Connect to the role database only if password matches
+                role_cursor = role_conn.cursor()
+
+                try:
+                    role_cursor.execute("SELECT role_name FROM role WHERE role_id = %s", (user[2],))
+                    role_data = role_cursor.fetchone()
+                    role_name = role_data[0] if role_data else None # Handle case where role is not found
+                finally:
+                    role_cursor.close() if role_cursor else None  # Check if role_cursor exists before closing
+                    role_conn.close() if role_conn else None   # Check if role_conn exists before closing
+
 
                 # New query to fetch all table names in the database
                 # cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
@@ -201,7 +218,7 @@ def fetch_company_login_data(email, password, company):
                     AND table_name NOT IN ('employee_list', 'datasource')
                 """)
                 tables = cursor.fetchall()
-
+                
                 # Print or log the table names
                 print("Tables in the database:")
                 for table in tables:
@@ -212,7 +229,9 @@ def fetch_company_login_data(email, password, company):
                 # return user,tables  # Return the user details (without the password)
                 return {
                     "user": user,  # User details
+                    "role_name": role_name, # Role Name
                     "tables": tables  # List of table names
+                   
                 }
             else:
                 print("Password does not match!")
