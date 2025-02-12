@@ -531,16 +531,16 @@ def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, agg
             while connection.notifies:
                 notify = connection.notifies.pop(0)
                 if notify.payload == table_name:
-                    if chartType == "singleValueChart":
-                        aggregate_py = {
-                        'count': 'count',
-                        'sum': 'sum',
-                        'average': 'mean',
-                        'minimum': 'min',
-                        'maximum': 'max'
-                    }.get(aggregation, 'sum') 
-                        updated_data = fetchText_data(db_nameeee, table_name, x_axis_columns[0], aggregate_py)
-                        socketio.emit("chart_update", {"data": updated_data})
+                    # if chartType == "singleValueChart":
+                    #     aggregate_py = {
+                    #     'count': 'count',
+                    #     'sum': 'sum',
+                    #     'average': 'mean',
+                    #     'minimum': 'min',
+                    #     'maximum': 'max'
+                    # }.get(aggregation, 'sum') 
+                    #     updated_data = fetchText_data(db_nameeee, table_name, x_axis_columns[0], aggregate_py)
+                    #     socketio.emit("chart_update", {"data": updated_data})
                     if len(y_axis_columns) == 2:
                         print("duealAxis=============duealAxis===================duealAxis========duealAxis")
                         updated_data=fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
@@ -685,96 +685,37 @@ def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, agg
 #     print(f"New listener started for {key}")
 
 
-
 @socketio.on("connect")
 def handle_connect():
-    """Handle connections with parameter validation"""
+    """Handle connections for both single value and other chart types"""
     params = request.args
-    required = ['selectedTable', 'xAxis', 'filterOptions', 'yAxis', 'aggregate', 'databaseName', 'chartType']
 
-    missing = [key for key in required if not params.get(key)]
-    if missing:
-        print(f"Missing parameters: {missing}")
+    # Check if it's a single value chart connection
+    single_value_required = ['text_y_table', 'text_y_xis', 'text_y_aggregate', 'text_y_database']
+    general_required = ['selectedTable', 'xAxis', 'filterOptions', 'yAxis', 'aggregate', 'databaseName', 'chartType']
+
+    if all(param in params for param in single_value_required):
+        key = tuple(params.get(key) for key in single_value_required)
+        target_func = listen_to_single_value_db
+    elif all(param in params for param in general_required):
+        key = tuple(params.get(key) for key in general_required)
+        target_func = listen_to_db
+    else:
+        print("Missing required parameters for either case.")
         return
 
-    chart_type = params.get("chartType")
-    x_axis = params.get("xAxis")
-
-    # Ensure xAxis is not empty
-    x_axis_columns = x_axis.split(",") if x_axis else []
-    
-    if chart_type == "single value chart":
-        # Validate and extract required values
-        if not x_axis_columns or not x_axis_columns[0]:
-            print("Error: xAxis is missing or empty for single value chart")
-            return
-        
-        key = (
-            params.get("databaseName"),
-            params.get("selectedTable"),
-            x_axis_columns[0],  # Ensure the first x-axis column is valid
-            params.get("aggregate"),
-        )
-    else:
-        key = tuple(params.get(key) for key in required)
-
-    print("+++++++++++++++++++++++++++++", key)
-
-    # Stop previous listener with same parameters
+    # Stop previous listener if exists
     if key in active_listeners:
         print(f"Stopping existing listener for {key}")
         del active_listeners[key]
 
-    # Create new listener with current parameters
-    listener = threading.Thread(
-        target=listen_to_db,
-        args=key,
-        daemon=True
-    )
+    # Create new listener with the respective function
+    listener = threading.Thread(target=target_func, args=key, daemon=True)
     listener.start()
     active_listeners[key] = listener
     print(f"New listener started for {key}")
 
-# @socketio.on("connect")
-# def handle_connect():
-    """Handle connections with parameter validation"""
-    params = request.args
-    required = ['selectedTable', 'xAxis', 'filterOptions', 'yAxis', 'aggregate', 'databaseName', 'chartType']
 
-    missing = [key for key in required if not params.get(key)]
-    if missing:
-        print(f"Missing parameters: {missing}")
-        return
-
-    chart_type = params.get("chartType")
-    
-    if chart_type == "single value chart":
-        # Extract required values for single value chart
-        key = (
-            params.get("databaseName"),
-            params.get("selectedTable"),
-            params.get("xAxis").split(",")[0] if params.get("xAxis") else None,  # Get first x-axis column
-            params.get("aggregate"),
-        )
-    else:
-        key = tuple(params.get(key) for key in required)
-
-    print("+++++++++++++++++++++++++++++", key)
-
-    # Stop previous listener with same parameters
-    if key in active_listeners:
-        print(f"Stopping existing listener for {key}")
-        del active_listeners[key]
-
-    # Create new listener with current parameters
-    listener = threading.Thread(
-        target=listen_to_db,
-        args=key,
-        daemon=True
-    )
-    listener.start()
-    active_listeners[key] = listener
-    print(f"New listener started for {key}")
 
 
 
@@ -846,20 +787,6 @@ def get_bar_chart_route():
     if not db_nameeee or not table_name:
         return jsonify({"error": "Database name and table name required"}), 400
     create_dynamic_trigger(db_nameeee, table_name)
- 
-
-    # connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
-    # database_con = psycopg2.connect(connection_path)
-    # new_df=fetch_chart_data(database_con, table_name)
-    # print("new_df====================", new_df)
-    # if df.equals(new_df):
-    #     print("Both DataFrames are equal")
-    # else:
-        
-    #     print("DataFrames are not equal")
-    #     bc.global_df = new_df
-    # df_json = df.to_json(orient='split')
-    # print(new_df)
     print("xaxis column__________________",x_axis_columns)
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
@@ -1798,6 +1725,77 @@ def receive_single_value_chart_data():
     return jsonify({"data": fetched_data,
                     "chart_id": chart_id,
                      "message": "Data received successfully!"})
+
+
+# @socketio.on("connect")
+# def handle_single_value_connect():
+#     """Handle connections with parameter validation"""
+#     params = request.args
+#     required = ['text_y_table', 'text_y_xis', 'text_y_aggregate', 'text_y_database']
+
+#     missing = [key for key in required if not params.get(key)]
+#     if missing:
+#         print(f"Missing parameters: {missing}")
+#         return
+    
+#     key = tuple(params.get(key) for key in required)
+#     print("+++++++++++++++++++++++++++++",key)
+
+#     # Stop previous listener with same parameters
+#     if key in active_listeners:
+#         print(f"Stopping existing listener for {key}")
+#         del active_listeners[key]
+
+#     # Create new listener with current parameters
+#     listener = threading.Thread(
+#         target=listen_to_single_value_db,
+#         args=key,
+#         daemon=True
+#     )
+#     listener.start()
+#     active_listeners[key] = listener
+#     print(f"New listener started for {key}")
+
+
+
+# databaseName, table_Name, x_axis,aggregate_py
+def listen_to_single_value_db(table_Name, x_axis, aggregate_py, databaseName):
+    """Continuously listen for updates with current parameters"""
+    if not isinstance(x_axis, list):
+        x_axis = [x_axis]
+    print("Listening for updates...")
+    print("X-Axis Columns:-------", x_axis)
+    thread = threading.current_thread()
+    try:
+        connection = psycopg2.connect(dbname=databaseName, **DB_CONFIG)
+        connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = connection.cursor()
+        cursor.execute("LISTEN chart_update;")
+        print(f"Listening with params: {databaseName}.{table_Name} ({x_axis}, {aggregate_py})")
+
+        while getattr(thread, "do_run", True):  # Check if the thread should stop
+            connection.poll()
+            while connection.notifies:
+                notify = connection.notifies.pop(0)
+                if notify.payload == table_Name:
+                    # if chartType == "singleValueChart":
+                    aggregate_py = {
+                    'count': 'count',
+                    'sum': 'sum',
+                    'average': 'mean',
+                    'minimum': 'min',
+                    'maximum': 'max'
+                }.get(aggregate_py, 'sum') 
+                    updated_data = fetchText_data(databaseName, table_Name, x_axis[0], aggregate_py)
+                    socketio.emit("chart_update", {"data": updated_data})
+
+    except Exception as e:
+        print(table_Name, x_axis, aggregate_py, databaseName)
+        print(f"Listener error: {repr(e)}")  # Better error output
+    finally:
+        cursor.close()
+        connection.close()
+
 
 
 @app.route('/api/text_chart', methods=['POST'])
