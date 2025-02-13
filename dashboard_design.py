@@ -1,7 +1,7 @@
 import psycopg2
 from flask import jsonify
-
-# import psycopg2
+import psycopg2
+import pandas as pd
 import re
 
 def get_database_table_names(db_name, username, password, host='localhost', port='5432'):
@@ -36,11 +36,6 @@ def get_database_table_names(db_name, username, password, host='localhost', port
         print(e)
         return jsonify([])
     
-
-
-import psycopg2
-import pandas as pd
-
 def is_numeric(value):
     try:
         float(value)

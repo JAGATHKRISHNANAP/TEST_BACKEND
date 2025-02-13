@@ -1,7 +1,5 @@
 import pandas as pd
 
-
-
 def generate_histogram_details(dataframe):
     axes = dataframe.hist()
     histogram_details = []
@@ -37,11 +35,6 @@ def generate_histogram_details(dataframe):
     ]
     
     return filtered_histogram_details
-
-
-
-
-
 
 def handle_column_data_types(df):
 

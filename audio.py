@@ -20,7 +20,6 @@ def allowed_file(filename, allowed_extensions):
 
 False
 
-
 def save_file_to_db(filename, file_data):
     try:
         # Ensure file_data is valid JSON

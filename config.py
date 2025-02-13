@@ -27,3 +27,12 @@ HOST = 'localhost'
 
 PORT = '5432'
 AUDIO_DATABASE_NAME = 'audio_database'
+
+
+
+DB_CONFIG = {
+    'user': 'postgres',
+    'password': 'jaTHU@12',
+    'host': 'localhost',
+    'port': 5432
+}

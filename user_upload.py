@@ -1,6 +1,3 @@
-
-
-
 from flask import Flask, jsonify, request
 import psycopg2
 import bcrypt
@@ -17,9 +14,6 @@ def get_db_connection(dbname="datasource"):
         host=HOST,
         port=PORT
     )
-
-
-
 
 def handle_manual_registration(user_details):
     conn_datasource = get_db_connection()
@@ -87,7 +81,6 @@ def handle_manual_registration(user_details):
         if conn:
             conn.close()
 
-
 def handle_file_upload_registration(user_details):
     conn_datasource = get_db_connection()
     if not conn_datasource:
@@ -154,7 +147,6 @@ def handle_file_upload_registration(user_details):
     finally:
         conn_datasource.close()
 
-
 def fetch_role_id(conn, role_name):
     with conn.cursor() as cursor:
         cursor.execute("SELECT role_id FROM role WHERE LOWER(role_name) = LOWER(%s)", (role_name,))
@@ -163,12 +155,10 @@ def fetch_role_id(conn, role_name):
             raise ValueError(f"Role not found for role name: {role_name}")
         return role_data[0]
 
-
 def check_username_exists(cursor, username):
     cursor.execute("SELECT COUNT(*) FROM employee_list WHERE username = %s", (username,))
     result = cursor.fetchone()
     return result and result[0] > 0
-
 
 def insert_user(cursor, employee_name, role_id, username, email, password, categories, action_type, action_by, reporting_id=None):
     cursor.execute("""
@@ -177,7 +167,6 @@ def insert_user(cursor, employee_name, role_id, username, email, password, categ
     """, (employee_name, role_id, username, email, password, categories, action_type, action_by, reporting_id))
     cursor.execute("SELECT currval(pg_get_serial_sequence('employee_list', 'employee_id'))")
     return cursor.fetchone()[0]
-
 
 def handle_categories(conn_datasource, employee_id, role_id, organization_name, categories):
     for category in categories:
@@ -201,14 +190,12 @@ def handle_categories(conn_datasource, employee_id, role_id, organization_name, 
                 VALUES (%s, %s, (SELECT id FROM organizationdatatest WHERE organizationname = %s), %s)
             """, (employee_id, role_id, organization_name, category_id))
 
-
 def encrypt_password(plain_password):
     """
     Encrypts a plain text password using bcrypt and returns the hashed password.
     """
     hashed_password = bcrypt.hashpw(plain_password.encode('utf-8'), bcrypt.gensalt())
     return hashed_password
-
 
 def get_company_db_connection(company_name):
     conn = psycopg2.connect(
@@ -219,8 +206,6 @@ def get_company_db_connection(company_name):
         port=PORT
     )
     return conn
-
-
 # Create user table in company database
 def create_user_table(conn):
     try:

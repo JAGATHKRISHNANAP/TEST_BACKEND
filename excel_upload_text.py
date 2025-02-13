@@ -14,6 +14,7 @@ def validate_table_structure(cur, table_name, df):
     cur.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s)", (table_name,))
     table_exists = cur.fetchone()[0]
     return table_exists
+
 def upload_excel_to_postgresql(db_name, username, password, excel_file_name, primary_key_column, host='localhost', port='5432'):
     try:
         current_dir = os.getcwd()

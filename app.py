@@ -1,4 +1,3 @@
-# 24-12-2024 updated
 import os
 from flask_cors import CORS
 import json
@@ -16,7 +15,7 @@ import psycopg2
 from audio import allowed_file,transcribe_audio_with_timestamps,save_file_to_db
 from histogram_utils import generate_histogram_details,handle_column_data_types
 from json_upload import upload_json_to_postgresql
-from config import  ALLOWED_EXTENSIONS,DB_NAME,USER_NAME,PASSWORD,HOST,PORT
+from config import  ALLOWED_EXTENSIONS,DB_NAME,USER_NAME,PASSWORD,HOST,PORT,DB_CONFIG
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 import pandas as pd
@@ -25,10 +24,16 @@ from flask_session import Session  # Flask-Session for server-side session handl
 import uuid
 from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data,fetch_ai_saved_chart_data
 from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
+from predictions import load_and_predict  
 from ai_charts import analyze_data
+from psycopg2.extras import RealDictCursor
+
 
 from flask_socketio import SocketIO, emit
 
+
+from psycopg2 import sql
+import threading
 
 
 
@@ -99,35 +104,6 @@ def test_db():
     except Exception as e:
         return {"error": f"Database connection failed: {e}"}, 500
 
-
-
-# @app.route('/uploadexcel', methods=['POST'])
-# def upload_file_excel():
-#     # database_name='excel_database'
-#     database_name = request.form.get('company_database') 
-#     # database_name = request.form.get('databaseName')
-#     excel_file = request.files['file']
-#     primary_key_column = request.form.get('primaryKeyColumnName')
-#     selected_sheets = request.form.getlist('selectedSheets')  # New addition
-
-#     print("database_name=============111111111111111111111111", database_name)
-#     print("method=============", request.method)
-#     print("files==============", request.files)
-#     print("primary_key_column====================", primary_key_column) 
-    
-#     print("selected_sheets ", selected_sheets)
-#     excel_file_name = secure_filename(excel_file.filename)
-#     os.makedirs('tmp', exist_ok=True)
-#     temp_file_path = f'tmp/{excel_file_name}'
-#     excel_file.save(temp_file_path)
-    
-    
-#     result=upload_excel_to_postgresql(database_name, username, password, temp_file_path, primary_key_column, host, port,selected_sheets)
-#     print("result====================",result)
-#     if result == "Upload successful":
-#         return jsonify({'message': 'File uploaded successfully'}), 200
-#     else:
-#         return jsonify({'message': result}), 200
 @app.route('/uploadexcel', methods=['POST'])
 def upload_file_excel():
     # database_name='excel_database'
@@ -156,20 +132,6 @@ def upload_file_excel():
     else:
         print("result====================",result)
         return jsonify({'message': result,'status':False}), 500
-
-
-# @app.route('/uploadcsv', methods=['POST'])
-# def upload_file_csv():
-#     excel_file = request.files['file']
-#     database_name = request.form.get('company_database')
-#     print("company_database====================",database_name)  
-#     excel_file_name = secure_filename(excel_file.filename)
-#     os.makedirs('tmp', exist_ok=True)
-#     temp_file_path = f'tmp/{excel_file_name}'
-#     excel_file.save(temp_file_path)
-#     # database_name='csv_database'
-#     upload_csv_to_postgresql(database_name, username, password, temp_file_path, host, port)
-#     return jsonify({'message': 'File uploaded successfully'})
 
 @app.route('/uploadcsv', methods=['POST'])
 def upload_file_csv():
@@ -208,48 +170,12 @@ def get_columns(table_name):
     print("column_names====================",column_names)
     return jsonify(column_names)
 
-
 @app.route('/ai_ml_chartdata', methods=['GET'])
 def ai_ml_charts():
     dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
     ai_ml_charts_details = analyze_data(dataframe)
     print("ai_ml_charts_details====================", ai_ml_charts_details)
     return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
-
-
-# @app.route('/ai_ml_filter_chartdata', methods=['GET'])
-# def ai_ml_filter_chart_data():
-#     dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
-#     filtered_dataframe = dataframe[dataframe['region'] == 'Asia']
-#     print("filtered_dataframe====================", filtered_dataframe)
-#     ai_ml_charts_details = analyze_data(filtered_dataframe)
-#     print("ai_ml_charts_details====================", ai_ml_charts_details)
-#     return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
-
-# @app.route('/ai_ml_filter_chartdata', methods=['GET'])
-# def ai_ml_filter_chart_data():
-#     # Get query parameters from the request
-#     x_axis = request.args.get('x_axis')
-#     category = request.args.get('category')
-
-#     if not x_axis or not category:
-#         return jsonify({"error": "Region and value are required"}), 400
-
-#     # Filter the DataFrame based on the query parameters
-#     dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
-#     filtered_dataframe = dataframe[dataframe[x_axis] == category]
-    
-#     print("Filtered DataFrame:", filtered_dataframe)
-#     ai_ml_charts_details = analyze_data(filtered_dataframe)
-#     print("AI/ML Charts Details:", ai_ml_charts_details)
-
-#     return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
-
-
-
-
-
-# from flask import request, jsonify
 
 @app.route('/ai_ml_filter_chartdata', methods=['POST'])
 def ai_ml_filter_chart_data():
@@ -258,39 +184,20 @@ def ai_ml_filter_chart_data():
         data = request.get_json()
         if not data or 'category' not in data or 'x_axis' not in data:
             return jsonify({"error": "category and x_axis are required"}), 400
-
         category = data['category']  # Value to filter by
         x_axis = data['x_axis']      # Region column name
-
         print("Category:", category)
         print("X-Axis:", x_axis)
-
         # Filter the DataFrame dynamically based on x_axis and category
         dataframe = bc.global_df  # Assuming bc.global_df is your DataFrame
         filtered_dataframe = dataframe[dataframe[x_axis] == category]
-
         print("Filtered DataFrame:", filtered_dataframe)
         ai_ml_charts_details = analyze_data(filtered_dataframe)
         # print("AI/ML Charts Details:", ai_ml_charts_details)
-
         return jsonify({"ai_ml_charts_details": ai_ml_charts_details})
     except Exception as e:
         print("Error:", str(e))
         return jsonify({"error": str(e)}), 500
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @app.route('/join-tables', methods=['POST'])
 def join_tables():
@@ -330,7 +237,6 @@ def join_tables():
 
     return jsonify({"message": f"View '{view_name}' created successfully"})
 
-
 @app.route('/api/fetchTableDetails', methods=['GET'])
 def get_table_data():
     company_name = request.args.get('databaseName')  # Get company name from the query
@@ -359,117 +265,6 @@ def get_table_data():
         # Log the error for better debugging
         print(f"Error: {e}")
         return jsonify({'error':str(e)}),500
-
-
-# @app.route('/plot_chart', methods=['POST', 'GET'])
-# def get_bar_chart_route():
-#     df = bc.global_df
-#     df_json = df.to_json(orient='split')  # Convert the DataFrame to JSON
-#     data = request.json
-
-#     table_name = data['selectedTable']
-#     x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
-#     y_axis_columns = data['yAxis']  # Assuming yAxis can be multiple columns as well
-#     aggregation = data['aggregate']
-#     checked_option = data['filterOptions']
-#     db_nameeee = data['databaseName']
-#     print("y_axis_columns====================", y_axis_columns)
-#     print("db_nameeee====================", db_nameeee)
-#     print("data====================", data)
-#     try:
-#         df[y_axis_columns[0]] = pd.to_datetime(df[y_axis_columns[0]], format='%H:%M:%S', errors='raise')
-
-#         # If successful, convert time format to minutes
-#         df[y_axis_columns[0]] = df[y_axis_columns[0]].apply(lambda x: x.hour * 60 + x.minute)
-#         print(f"{y_axis_columns[0]} converted to minutes.")
-#     except ValueError:
-#         # If conversion fails, it is not in time format
-#         print(f"{y_axis_columns[0]} is not in time format. No conversion applied.")
-
-#     if len(y_axis_columns) == 1:
-#         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
-#         print("Data for single y-axis column:------------------------------------------------------------------------", data)
-        
-#         if aggregation == "count":
-#             print("Data for count aggregation:", data)
-#             array1 = [item[0] for item in data]
-#             array2 = [item[1] for item in data]
-#             print("Array1:", array1)
-#             print("Array2:", array2)
-            
-#             # Return the JSON response for count aggregation
-#             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
-#         elif aggregation == "average":
-#             array1 = [item[0] for item in data]
-#             array2 = [item[1] for item in data]
-#             print("Array1:", array1)
-#             print("Array2:", array2)
-#             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
-        
-#         # For other aggregation types
-#         categories = {}
-#         for row in data:
-#             category = tuple(row[:-1])
-#             y_axis_value = row[-1]
-#             if category not in categories:
-#                 categories[category] = initial_value(aggregation)
-#             update_category(categories, category, y_axis_value, aggregation)
-
-#         labels = [', '.join(category) for category in categories.keys()]
-#         values = list(categories.values())
-#         print("labels====================", labels)
-#         print("values====================", values)
-        
-#         # Return the JSON response for other aggregations
-#         return jsonify({"categories": labels, "values": values, "aggregation": aggregation, "dataframe": df_json})
-
-
-#     elif len(y_axis_columns) == 2:
-#         datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
-        
-#         data = {
-#             "categories": [row[0] for row in datass],
-#             "series1": [row[1] for row in datass],
-#             "series2": [row[2] for row in datass],
-#             "dataframe": df_json
-#         }
-        
-#         return jsonify(data)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-from psycopg2 import sql
-import threading
-DB_CONFIG = {
-    'user': 'postgres',
-    'password': 'jaTHU@12',
-    'host': 'localhost',
-    'port': 5432
-}
 
 active_listeners = {}  # Store active listener threads
 def create_dynamic_trigger(db_nameeee, table_name):
@@ -502,10 +297,6 @@ def create_dynamic_trigger(db_nameeee, table_name):
         print(f"Trigger and function created for {db_nameeee}.{table_name}")
     except Exception as e:
         print(f"Error creating trigger: {e}")
-
-
-
-
 
 def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,chartType):
     """Continuously listen for updates with current parameters"""
@@ -564,127 +355,6 @@ def listen_to_db(table_name, x_axis_columns, checked_option, y_axis_columns, agg
         cursor.close()
         connection.close()
 
-# def listen_to_single_Value_db(table_name, x_axis_columns, aggregation, db_nameeee):
-#     """Continuously listen for updates with current parameters"""
-#     if not isinstance(x_axis_columns, list):
-#         x_axis_columns = [x_axis_columns]
-    
-#     print(f"Listening for updates on {db_nameeee}.{table_name} for {x_axis_columns}")
-
-#     thread = threading.current_thread()
-#     try:
-#         connection = psycopg2.connect(dbname=db_nameeee, **DB_CONFIG)
-#         connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-#         cursor = connection.cursor()
-#         cursor.execute("LISTEN chart_update;")
-#         print(f"Successfully listening to chart_update on {table_name}")
-
-#         while getattr(thread, "do_run", True):  # Check if the thread should stop
-#             connection.poll()
-#             while connection.notifies:
-#                 notify = connection.notifies.pop(0)
-#                 print(f"Received notification: {notify.payload}")  # Debugging line
-#                 if notify.payload == table_name:
-#                     aggregate_py = {
-#                         'count': 'count',
-#                         'sum': 'sum',
-#                         'average': 'mean',
-#                         'minimum': 'min',
-#                         'maximum': 'max'
-#                     }.get(aggregation, 'sum') 
-#                     updated_data = fetchText_data(db_nameeee, table_name, x_axis_columns[0], aggregate_py)
-#                     socketio.emit("chart_update", {"data": updated_data})
-#     except Exception as e:
-#         print(f"Listener error: {repr(e)}")  # Better error output
-#     finally:
-#         cursor.close()
-#         connection.close()
-
-
-
-
-
-
-
-# @app.route('/plot_chart', methods=['POST', 'GET'])
-# def get_bar_chart_route():
-#     df = bc.global_df
-#   # Convert the DataFrame to JSON
-#     data = request.json
-
-#     table_name = data['selectedTable']
-#     x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
-#     y_axis_columns = data['yAxis']  # Assuming yAxis can be multiple columns as well
-#     aggregation = data['aggregate']
-#     checked_option = data['filterOptions']
-#     db_nameeee = data['databaseName']
-#     df_json = df.to_json(orient='split')
-#     if not db_nameeee or not table_name:
-#         return jsonify({"error": "Database name and table name required"}), 400
-#     create_dynamic_trigger(db_nameeee, table_name)
- 
-#     if len(y_axis_columns) == 1:
-#         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee)
-        
-#         if aggregation == "count":
-#             print("Data for count aggregation:", data)
-#             array1 = [item[0] for item in data]
-#             array2 = [item[1] for item in data]
-#             print("Array1:", array1)
-#             print("Array2:", array2)
-            
-#             # Return the JSON response for count aggregation
-#             return jsonify({"categories": array1, "values": array2, "aggregation": aggregation, "dataframe": df_json})
-        
-#         # For other aggregation types
-#         categories = {}
-#         for row in data:
-#             category = tuple(row[:-1])
-#             y_axis_value = row[-1]
-#             if category not in categories:
-#                 categories[category] = initial_value(aggregation)
-#             update_category(categories, category, y_axis_value, aggregation)
-
-#         labels = [', '.join(category) for category in categories.keys()]
-#         values = list(categories.values())
-#         print("labels====================", labels)
-#         print("values====================", values)
-        
-#         # Return the JSON response for other aggregations
-#         return jsonify({"categories": labels, "values": values, "aggregation": aggregation, "dataframe": df_json})
-
-
-
-# @socketio.on("connect")
-# def handle_connect():
-#     """Handle connections with parameter validation"""
-#     params = request.args
-#     required = ['selectedTable', 'xAxis', 'filterOptions','yAxis', 'aggregate', 'databaseName','chartType']
-
-#     missing = [key for key in required if not params.get(key)]
-#     if missing:
-#         print(f"Missing parameters: {missing}")
-#         return
-    
-#     key = tuple(params.get(key) for key in required)
-#     print("+++++++++++++++++++++++++++++",key)
-
-#     # Stop previous listener with same parameters
-#     if key in active_listeners:
-#         print(f"Stopping existing listener for {key}")
-#         del active_listeners[key]
-
-#     # Create new listener with current parameters
-#     listener = threading.Thread(
-#         target=listen_to_db,
-#         args=key,
-#         daemon=True
-#     )
-#     listener.start()
-#     active_listeners[key] = listener
-#     print(f"New listener started for {key}")
-
-
 @socketio.on("connect")
 def handle_connect():
     """Handle connections for both single value and other chart types"""
@@ -714,61 +384,6 @@ def handle_connect():
     listener.start()
     active_listeners[key] = listener
     print(f"New listener started for {key}")
-
-
-
-
-
-
-# @socketio.on("connect_single_value_chart")
-# def handle_single_value_connect(data):
-#     """Handle WebSocket connection for single-value charts"""
-#     table_name = data.get("table")
-#     x_axis = data.get("x_axis")
-#     aggregate = data.get("aggregate")
-#     db_name = data.get("database")
-
-#     if not table_name or not x_axis or not aggregate or not db_name:
-#         print("Missing parameters for single-value chart update")
-#         return
-
-#     key = (table_name, x_axis, aggregate, db_name)
-
-#     # if key in active_listeners:
-#     #     print(f"Stopping existing listener for {key}")
-#     #     active_listeners[key].do_run = False  # Stop the existing thread
-#     #     del active_listeners[key]
-
-#     # listener = threading.Thread(
-#     #     target=listen_to_single_Value_db,
-#     #     args=(table_name, [x_axis], aggregate, db_name),
-#     #     daemon=True
-#     # )
-#     # listener.start()
-#     # active_listeners[key] = listener
-#     # print(f"New listener started for {key}")
-#     print("+++++++++++++++++++++++++++++",key)
-
-#     # Stop previous listener with same parameters
-#     if key in active_listeners:
-#         print(f"Stopping existing listener for {key}")
-#         del active_listeners[key]
-
-#     # Create new listener with current parameters
-#     listener = threading.Thread(
-#         target=listen_to_single_Value_db,
-#         args=key,
-#         daemon=True
-#     )
-#     listener.start()
-#     active_listeners[key] = listener
-#     print(f"New listener started for {key}")
-
-
-
-
-
-
 
 @app.route('/plot_chart', methods=['POST', 'GET'])
 def get_bar_chart_route():
@@ -914,48 +529,6 @@ def get_bar_chart_route():
         }
         
         return jsonify(data)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def initial_value(aggregation):
     if aggregation in ['sum', 'average']:
@@ -1370,7 +943,6 @@ def get_chart_names(user_id, company_name_global):
 
     return dashboard_structure
 
-
 @app.route('/total_rows', methods=['GET'])
 def chart_names():
     global company_name_global
@@ -1660,41 +1232,6 @@ def login():
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
 
-# @app.route('/api/singlevalue_text_chart', methods=['POST'])
-# def receive_single_value_chart_data():
-#     data = request.get_json()
-#     print("data====================",data)
-#     chart_id=data.get('chart_id')
-#     x_axis = data.get('text_y_xis')[0]
-#     databaseName = data.get('text_y_database')
-#     table_Name = data.get('text_y_table')
-#     print("table_Name====================",table_Name)
-#     aggregate=data.get('text_y_aggregate')
-#     print("x_axis====================",x_axis)  
-#     print("databaseName====================",)  
-#     print("table_Name====================",table_Name)
-#     print("aggregate====================",aggregate)
-#     create_dynamic_trigger(databaseName, table_Name
-#                            )
-#     aggregate_py = {
-#                     'count': 'count',
-#                     'sum': 'sum',
-#                     'average': 'mean',
-#                     'minimum': 'min',
-#                     'maximum': 'max'
-#                 }.get(aggregate, 'sum') 
-#     fetched_data = fetchText_data(databaseName, table_Name, x_axis,aggregate_py)
-#     print("Fetched Data:", fetched_data)
-#     print(f"Received x_axis: {x_axis}")
-#     print(f"Received databaseName: {databaseName}")
-#     print(f"Received table_Name: {table_Name}")
-#     print(f"aggregate====================",{aggregate})
-#     return jsonify({"data": fetched_data,
-#                     "chart_id": chart_id,
-#                      "message": "Data received successfully!"})
-
-
-
 @app.route('/api/singlevalue_text_chart', methods=['POST'])
 def receive_single_value_chart_data():
     data = request.get_json()
@@ -1726,39 +1263,6 @@ def receive_single_value_chart_data():
                     "chart_id": chart_id,
                      "message": "Data received successfully!"})
 
-
-# @socketio.on("connect")
-# def handle_single_value_connect():
-#     """Handle connections with parameter validation"""
-#     params = request.args
-#     required = ['text_y_table', 'text_y_xis', 'text_y_aggregate', 'text_y_database']
-
-#     missing = [key for key in required if not params.get(key)]
-#     if missing:
-#         print(f"Missing parameters: {missing}")
-#         return
-    
-#     key = tuple(params.get(key) for key in required)
-#     print("+++++++++++++++++++++++++++++",key)
-
-#     # Stop previous listener with same parameters
-#     if key in active_listeners:
-#         print(f"Stopping existing listener for {key}")
-#         del active_listeners[key]
-
-#     # Create new listener with current parameters
-#     listener = threading.Thread(
-#         target=listen_to_single_value_db,
-#         args=key,
-#         daemon=True
-#     )
-#     listener.start()
-#     active_listeners[key] = listener
-#     print(f"New listener started for {key}")
-
-
-
-# databaseName, table_Name, x_axis,aggregate_py
 def listen_to_single_value_db(table_Name, x_axis, aggregate_py, databaseName):
     """Continuously listen for updates with current parameters"""
     if not isinstance(x_axis, list):
@@ -1796,8 +1300,6 @@ def listen_to_single_value_db(table_Name, x_axis, aggregate_py, databaseName):
         cursor.close()
         connection.close()
 
-
-
 @app.route('/api/text_chart', methods=['POST'])
 def receive_chart_data():
     data = request.get_json()
@@ -1822,7 +1324,6 @@ def receive_chart_data():
     return jsonify({"data": fetched_data,
                     "chart_id": chart_id,
                      "message": "Data received successfully!"})
-
 
 @app.route('/api/handle-clicked-category',methods=['POST'])
 def handle_clicked_category():
@@ -1873,7 +1374,6 @@ def handle_clicked_category():
         print(chart_data_list)
     return jsonify({"message": "Category clicked successfully!",
                     "chart_data_list": chart_data_list})
-
 
 @app.route('/api/send-chart-details', methods=['POST'])
 def receive_chart_details():
@@ -2143,8 +1643,6 @@ def receive_chart_details():
         print("Error: ", e)
         return jsonify({"message": "Error processing request", "error": str(e)}), 500
 
-
-
 def get_dashboard_data(dashboard_name):
     conn = connect_to_db()
     if conn:
@@ -2194,8 +1692,6 @@ def saved_dashboard_names():
         return jsonify({'chart_names': names})
     else:
         return jsonify({'error': 'Failed to fetch chart names'})
-
-
 
 @app.route('/api/usersignup', methods=['POST'])
 def usersignup():
@@ -2253,13 +1749,6 @@ def get_roles():
     print(role_list)
     return jsonify(role_list)
 
-# @app.route('/fetchglobeldataframe', methods=['GET'])
-# def get_hello_data():
-#     dataframe=bc.global_df
-#     print("dataframe........................",dataframe)
-#     dataframe_dict = dataframe.to_dict(orient='records')
-#     return jsonify({"data frame":dataframe_dict})
-
 @app.route('/fetchglobeldataframe', methods=['GET'])
 def get_hello_data():
     dataframe = bc.global_df
@@ -2308,8 +1797,6 @@ def ai_boxPlotChart():
         # "data_frame": dataframe_dict,
         "histogram_details": details
     })
-
-# ////////-----------------15-10-2024-----------gayathri------//////////
 
 @app.route('/api/fetch_categories', methods=['GET'])
 def fetch_categories():
@@ -2540,7 +2027,6 @@ def update_user(username):
         if conn:
             conn.close()
 
-from predictions import load_and_predict  
 @app.route('/api/predictions', methods=['GET','POST'])
 def get_predictions():
     data = request.json
@@ -2687,15 +2173,6 @@ def get_employees():
 
     return jsonify(employee_list)
 
-
-
-
-
-
-# test
-from psycopg2.extras import RealDictCursor
-
-
 @app.route('/delete-chart', methods=['DELETE'])
 def delete_dashboard_name():
     chart_name = request.json.get('chart_name')  # Get the chart_name from JSON body
@@ -2724,7 +2201,6 @@ def delete_dashboard_name():
         print("Error while deleting chart:", e)
         return jsonify({"error": "Failed to delete chart"}), 500
 
-
 @app.route('/api/charts/<string:chart_name>', methods=['DELETE'])
 def delete_chart(chart_name):
     conn = get_db_connection()
@@ -2752,7 +2228,6 @@ def delete_chart(chart_name):
     except Exception as e:
         print("Error while deleting chart:", e)
         return jsonify({"error": "Failed to delete chart"}), 500
-
 
 @app.route('/api/is-chart-in-dashboard', methods=['GET'])
 def is_chart_in_dashboard():
@@ -2796,8 +2271,6 @@ WHERE
         print("Error checking chart usage:", e)
         return jsonify({"error": "Failed to check if chart is used"}), 500
     
-
-       
 @app.route('/api/checkTableUsage', methods=['GET'])
 def check_table_usage():
     table_name = request.args.get('tableName')
@@ -2829,7 +2302,6 @@ def is_table_used_in_charts( table_name):
         (table_name,)
     )
     return cur.fetchone()[0]
-
 
 def get_table_columns(table_name,company_name):
     company = company_name
@@ -2874,15 +2346,6 @@ def api_get_table_columns(table_name):
         return jsonify(columns), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-
-
-
-
-# if __name__ == "__main__":
-#     app.run(debug=True, host='0.0.0.0', port=5000)
-#     # app.run(debug=True)
 
 if __name__ == "__main__":
     # Use socketio.run to enable WebSocket support
