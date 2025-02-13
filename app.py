@@ -163,6 +163,7 @@ def get_table_names():
     table_names = table_names_response.get_json()  
     return jsonify(table_names)
 
+
 @app.route('/column_names/<table_name>',methods=['GET'] )
 def get_columns(table_name):
     db_nameeee= request.args.get('databaseName')
