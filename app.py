@@ -267,10 +267,18 @@ def get_bar_chart_route():
     # df_json = df.to_json(orient='split')  # Convert the DataFrame to JSON
     data = request.json
     print("data",data)
+    try:
+        x_axis_columns = [col.strip() for col in data['xAxis'].split(',')]
+    except AttributeError:
+        x_axis_columns = []
+        print("xAxis is not a string, check the request data")
+        return jsonify({"error": "xAxis must be a string"})  # Return an error response
+
     table_name = data['selectedTable']
-    x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
+    # x_axis_columns = data['xAxis'].split(', ')  # Split multiple columns into a list
     y_axis_columns = data['yAxis']  # Assuming yAxis can be multiple columns as well
     aggregation = data['aggregate']
+    filter_options = data['filterOptions']
     checked_option = data['filterOptions']
     db_nameeee = data['databaseName']
     selectedUser = data['selectedUser']
@@ -320,15 +328,21 @@ def get_bar_chart_route():
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
     print("data====================", data)
-    
-    if len(y_axis_columns) == 0 and chart_data == "wordCloud": 
-        # Handle WordCloud scenario
-        
+    for column, filters in filter_options.items():
+        print(f"Filtering column '{column}' by: {filters}")
+        if column in new_df.columns:
+            new_df = new_df[new_df[column].isin(filters)]
+    if len(y_axis_columns) == 0 and chart_data == "wordCloud":
+        all_text = ""
+        for index, row in new_df.iterrows():  # Use filtered DataFrame
+            for col in filter_options.keys():
+                if col in new_df.columns:
+                    all_text += str(row[col]) + " "
+
         query = f"""
             SELECT word, COUNT(*) AS word_count
             FROM (
-                SELECT regexp_split_to_table('{checked_option}', '\\s+') AS word
-                FROM {table_name}
+                SELECT regexp_split_to_table('{all_text}', '\\s+') AS word
             ) AS words
             GROUP BY word
             ORDER BY word_count DESC;
@@ -394,7 +408,7 @@ def get_bar_chart_route():
             return jsonify({
                 "categories": [row[0] for row in data],  # First X-axis category
                 "series1": [row[1] for row in data],  # Series 1 data
-                "series2": [row[1] for row in data],  # Series 2 data
+                "series2": [row[2] for row in data],  # Series 2 data
                 "dataframe": df_json
             })
         
@@ -409,7 +423,8 @@ def get_bar_chart_route():
         print(f"{y_axis_columns[0]} is not in time format. No conversion applied.")
 
     if len(y_axis_columns) == 1:
-        data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
+        # data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
+        data = fetch_data(table_name, x_axis_columns, filter_options, y_axis_columns, aggregation, db_nameeee, selectedUser)
         
         if aggregation == "count":
             print("Data for count aggregation:", data)
@@ -450,18 +465,33 @@ def get_bar_chart_route():
         # Return the JSON response for other aggregations
         return jsonify({"categories": labels, "values": values, "aggregation": aggregation, "dataframe": df_json})
 
-
     elif len(y_axis_columns) == 2:
-        datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
-        
-        data = {
-            "categories": [row[0] for row in datass],
-            "series1": [row[1] for row in datass],
-            "series2": [row[2] for row in datass],
+        data = fetch_data_for_duel(table_name, x_axis_columns, filter_options, y_axis_columns, aggregation, db_nameeee, selectedUser)
+        print("Data from fetch_data_for_duel:")  # Print before returning
+        print("Categories:", [row[0] for row in data])
+        print("Series1:", [row[1] for row in data])
+        print("Series2:", [row[2] for row in data])
+        return jsonify({
+            "categories": [row[0] for row in data],
+            "series1": [row[1] for row in data],
+            "series2": [row[2] for row in data],
             "dataframe": df_json
-        }
+        })
         
-        return jsonify(data)
+
+    return jsonify({"message": "Chart data processed successfully."})
+    # elif len(y_axis_columns) == 2:
+    #     datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
+        
+    #     data = {
+    #         "categories": [row[0] for row in datass],
+    #         "series1": [row[1] for row in datass],
+    #         "series2": [row[2] for row in datass],
+    #         "dataframe": df_json
+    #     }
+        
+    #     return jsonify(data)
+
     
 def initial_value(aggregation):
     if aggregation in ['sum', 'average']:
@@ -508,6 +538,7 @@ def get_edit_chart_route():
     db_nameeee = data['databaseName']
     chartType = data['chartType']
     selectedUser=data['selectedUser']
+    
     print(".......................................",data)
     print(".......................................db_nameeee",db_nameeee)
     print(".......................................checked_option",checked_option)
@@ -515,8 +546,19 @@ def get_edit_chart_route():
     print(".......................................yAxis",y_axis_columns)
     print(".......................................table_name",table_name)
     print('......................................selectedUser',selectedUser)
-    if len(y_axis_columns) == 1:
-        data = edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
+    if chartType == "duealbarChart":
+        datass = fetch_data_for_duel(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
+        data = {
+             "categories": [row[0] for row in datass],
+            "series1": [row[1] for row in datass],
+            "series2": [row[2] for row in datass],
+            "aggregation": aggregation
+        }
+        print("data====================", data)
+        
+        return jsonify(data)
+    elif len(y_axis_columns) == 1 :
+        data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         print("data====================", data)     
         categories = {}  
         for row in data:
@@ -600,6 +642,7 @@ def get_edit_chart_route():
         print("data====================", data)
         
         return jsonify(data)
+    
 
 def edit_initial_value(aggregation):
     if aggregation in ['sum', 'average']:
@@ -794,6 +837,7 @@ def save_data():
         conn = connect_to_db()
         cur = conn.cursor()
         chart_heading_json = json.dumps(data.get('chart_heading'))
+        filter_options_json = json.dumps(data.get('filterOptions')) 
         cur.execute("""
             INSERT INTO new_dashboard_details_new (
                 User_id,
@@ -832,7 +876,7 @@ def save_data():
             data.get('chartColor'),
             chart_heading_json,
             data.get('drillDownChartColor'),
-            data.get('filterOptions'),
+            filter_options_json,
             json.dumps(data.get('ai_chart_data')),  # Serialize ai_chart_data as JSON
             data.get('selectedUser'),
             data.get('xFontSize'),
@@ -1492,7 +1536,7 @@ def handle_clicked_category():
     return jsonify({"message": "Category clicked successfully!",
                     "chart_data_list": chart_data_list})
 
-
+import json
 @app.route('/api/send-chart-details', methods=['POST'])
 def receive_chart_details():
     data = request.json
@@ -1503,7 +1547,9 @@ def receive_chart_details():
     aggregate = data.get('aggregate')  # Aggregation method, e.g., 'sum', 'mean', etc.
     chart_type = data.get('chart_type')
     chart_heading = data.get('chart_heading')
-    filter_options = data.get('filter_options').split(', ')  # Convert filter_options string to a list
+    # filter_options = data.get('filter_options').split(', ')  # Convert filter_options string to a list
+   
+    filter_options = json.loads(data.get('filter_options').replace("'", '"'))
     databaseName = data.get('databaseName')
     company_name=data.get('databaseName')
     print("chart_id====================", chart_id)
@@ -1515,7 +1561,8 @@ def receive_chart_details():
     print("chart_heading====================", chart_heading)
     print("filter_options====================", filter_options)
     print("databaseName====================", databaseName)
-   
+    # filter_options = data.get('filter_options')
+  
     # Define aggregate function based on request
     aggregate_py = {
         'count': 'count',
@@ -1544,23 +1591,6 @@ def receive_chart_details():
             print("Fetched selectedUser:", selectedUser)
 
 
-            # savename=data.get('selectedUser')
-            # print("savename",savename)
-            # connection = fetch_external_db_connection(company_name,savename)  # Custom logic for 'external' connection type
-            # host = connection[3]
-            # dbname = connection[7]
-            # user = connection[4]
-            # password = connection[5]
-            
-            # # Create a new psycopg2 connection using the details from the tuple
-            # connection = psycopg2.connect(
-            #     dbname=dbname,
-            #     user=user,
-            #     password=password,
-            #     host=host
-            # )
-            # print('External Connection established:', connection)
-        
             if selectedUser:
                 connection = fetch_external_db_connection(company_name, selectedUser)
                 host = connection[3]
@@ -1616,6 +1646,25 @@ def receive_chart_details():
                     print("Error executing WordCloud query:", e)
                     return jsonify({"error": str(e)}), 500
         # Logic for 'singleValueChart'
+        if chart_type == "duealbarChart":
+            datass = fetch_data_for_duel(tableName, x_axis, filter_options, y_axis, aggregate, databaseName,selectedUser)
+            # data = {
+            #     "categories": [row[0] for row in datass],
+            #     "series1": [row[1] for row in datass],
+            #     "series2": [row[2] for row in datass],
+            #     "aggregation": aggregation
+            # }
+            return jsonify({
+                        "message": "Chart details received successfully!",
+                        "categories": [row[0] for row in datass],
+                        "series1":[row[1] for row in datass],
+                        "series2": [row[2] for row in datass],
+                        "chart_type": chart_type,
+                        "chart_heading": chart_heading,
+                        "x_axis": x_axis,
+                        "y_axis": y_axis,
+                    }), 200
+            
         if chart_type == 'singleValueChart':
             try:
                 df[y_axis[0]] = pd.to_numeric(df[y_axis[0]], errors='coerce')
@@ -1682,8 +1731,14 @@ def receive_chart_details():
                 chosen_grouped_df = grouped_df_valid
                 categories = chosen_grouped_df[x_axis[0]].tolist()
                 values = chosen_grouped_df["count"].tolist()
-                filtered_categories = []
-                filtered_values = []
+                filtered_categories = list(set([
+                    cat for cat in categories if cat.lower() in [opt.lower() for opt in filter_options]
+                ]))
+
+                filtered_values = [
+                    val for cat, val in zip(categories, values)
+                    if cat.lower() in [opt.lower() for opt in filter_options] and cat in filtered_categories
+                ]
                 for category, value in zip(categories, values):
                     if category in filter_options:
                         filtered_categories.append(category)
@@ -1705,80 +1760,146 @@ def receive_chart_details():
                 }), 200
             else:
                 if len(y_axis) == 2:
-                    for axis in y_axis:
-                        try:
-                            df[axis] = pd.to_datetime(df[axis], errors='raise', format='%H:%M:%S')
-                            df[axis] = df[axis].apply(lambda x: x.hour * 60 + x.minute)
-                        except (ValueError, TypeError):
-                            df[axis] = pd.to_numeric(df[axis], errors='coerce')
+                    # for axis in y_axis:
+                    #     try:
+                    #         df[axis] = pd.to_datetime(df[axis], errors='raise', format='%H:%M:%S')
+                    #         df[axis] = df[axis].apply(lambda x: x.hour * 60 + x.minute)
+                    #     except (ValueError, TypeError):
+                    #         df[axis] = pd.to_numeric(df[axis], errors='coerce')
 
-                    grouped_df = df.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
-                    print("Grouped DataFrame (dual y-axis): ", grouped_df.head())
+                    # grouped_df = df.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
+                    # print("Grouped DataFrame (dual y-axis): ", grouped_df.head())
 
-                    categories = grouped_df[x_axis[0]].tolist()
-                    values1 = [float(value) for value in grouped_df[y_axis[0]]]  # Convert Decimal to float
-                    values2 = [float(value) for value in grouped_df[y_axis[1]]]  # Convert Decimal to float
+                    # categories = grouped_df[x_axis[0]].tolist()
+                    # values1 = [float(value) for value in grouped_df[y_axis[0]]]  # Convert Decimal to float
+                    # values2 = [float(value) for value in grouped_df[y_axis[1]]]  # Convert Decimal to float
 
-                    # Filter categories and values based on filter_options
-                    filtered_categories = []
-                    filtered_values1 = []
-                    filtered_values2 = []
-                    for category, value1, value2 in zip(categories, values1, values2):
-                        if category in filter_options:
-                            filtered_categories.append(category)
-                            filtered_values1.append(value1)
-                            filtered_values2.append(value2)
+                    # # Filter categories and values based on filter_options
+                    # filtered_categories = list(set([
+                    #     cat for cat in categories if cat.lower() in [opt.lower() for opt in filter_options]
+                    # ]))
+                    # filtered_values1 = [
+                    #     val1 for cat, val1, val2 in zip(categories, values1, values2)
+                    #     if cat.lower() in [opt.lower() for opt in filter_options] and cat in filtered_categories
+                    # ]
+                    # filtered_values2 = [
+                    #     val2 for cat, val1, val2 in zip(categories, values1, values2)
+                    #     if cat.lower() in [opt.lower() for opt in filter_options] and cat in filtered_categories
+                    # ]
+                    # for category, value1, value2 in zip(categories, values1, values2):
+                    #     if category in filter_options:
+                    #         filtered_categories.append(category)
+                    #         filtered_values1.append(value1)
+                    #         filtered_values2.append(value2)
 
-                    print("filtered_categories====================", filtered_categories)
-                    print("filtered_values1====================", filtered_values1)
-                    print("filtered_values2====================", filtered_values2)
+                    # print("filtered_categories====================", filtered_categories)
+                    # print("filtered_values1====================", filtered_values1)
+                    # print("filtered_values2====================", filtered_values2)
 
-                    connection.close()
+                    # connection.close()
+                    datass = fetch_data_for_duel(tableName, x_axis, filter_options, y_axis, aggregate, databaseName,selectedUser)
+            
 
                     # Return the filtered data for both series
                     return jsonify({
                         "message": "Chart details received successfully!",
-                        "categories": filtered_categories,
-                        "series1": filtered_values1,
-                        "series2": filtered_values2,
+                        "categories": [row[0] for row in datass],
+                        "series1":[row[1] for row in datass],
+                        "series2": [row[2] for row in datass],
                         "chart_type": chart_type,
                         "chart_heading": chart_heading,
                         "x_axis": x_axis,
                     }), 200
 
-                else:
-                    # Handle single y-axis column
-                    try:
-                        df[y_axis[0]] = pd.to_datetime(df[y_axis[0]], errors='raise', format='%H:%M:%S')
-                        df[y_axis[0]] = df[y_axis[0]].apply(lambda x: x.hour * 60 + x.minute)
-                    except (ValueError, TypeError):
-                        df[y_axis[0]] = pd.to_numeric(df[y_axis[0]], errors='coerce')
+                # else:
+                #     # Handle single y-axis column
+                #     try:
+                #         df[y_axis[0]] = pd.to_datetime(df[y_axis[0]], errors='raise', format='%H:%M:%S')
+                #         df[y_axis[0]] = df[y_axis[0]].apply(lambda x: x.hour * 60 + x.minute)
+                #     except (ValueError, TypeError):
+                #         df[y_axis[0]] = pd.to_numeric(df[y_axis[0]], errors='coerce')
 
-                    grouped_df = df.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
+                #     grouped_df = df.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
 
-                    print("Grouped DataFrame: ", grouped_df.head())
+                #     print("Grouped DataFrame: ", grouped_df.head())
 
-                    categories = grouped_df[x_axis[0]].tolist()
-                    values = [float(value) for value in grouped_df[y_axis[0]]]  # Convert Decimal to float
+                #     categories = grouped_df[x_axis[0]].tolist()
+                #     values = [float(value) for value in grouped_df[y_axis[0]]]  # Convert Decimal to float
 
-                    # Filter categories and values based on filter_options
-                    filtered_categories = []
-                    filtered_values = []
-                    for category, value in zip(categories, values):
-                        if category in filter_options:
-                            filtered_categories.append(category)
-                            filtered_values.append(value)
+                #     # Filter categories and values based on filter_options
+                #     filtered_categories = list(set([
+                #         cat for cat in categories if cat.lower() in [opt.lower() for opt in filter_options]
+                #     ]))
 
-                    print("filtered_categories====================", filtered_categories)
-                    print("filtered_values====================", filtered_values)
+                #     filtered_values = [
+                #         val for cat, val in zip(categories, values)
+                #         if cat.lower() in [opt.lower() for opt in filter_options] and cat in filtered_categories
+                #     ]
+                #     for category, value in zip(categories, values):
+                #         if category in filter_options:
+                #             filtered_categories.append(category)
+                #             filtered_values.append(value)
 
-                    connection.close()
+                #     print("filtered_categories====================", filtered_categories)
+                #     print("filtered_values====================", filtered_values)
+
+                #     connection.close()
+                # else:  # Single y-axis column
+                #     try:
+                #         df[y_axis[0]] = pd.to_datetime(df[y_axis[0]], errors='raise', format='%H:%M:%S')
+                #         df[y_axis[0]] = df[y_axis[0]].apply(lambda x: x.hour * 60 + x.minute)
+                #     except (ValueError, TypeError):
+                #         df[y_axis[0]] = pd.to_numeric(df[y_axis[0]], errors='coerce')
+
+                #     grouped_df = df.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
+
+                #     print("Grouped DataFrame: ", grouped_df.head())
+
+                #     categories = grouped_df[x_axis[0]].tolist()
+                #     values = [float(value) for value in grouped_df[y_axis[0]]]
+
+                #     # Correct and efficient filtering:
+                #     filtered_categories = []
+                #     filtered_values = []
+
+                #     # Use a set to track categories already added to filtered lists
+                #     added_categories = set()
+
+                #     for cat, val in zip(categories, values):
+                #         if cat.lower() in [opt.lower() for opt in filter_options] and cat not in added_categories:
+                #             filtered_categories.append(cat)
+                #             filtered_values.append(val)
+                #             added_categories.add(cat)  # Mark the category as added
+
+
+                #     print("filtered_categories====================", filtered_categories)
+                #     print("filtered_values====================", filtered_values)
+
+                #     connection.close()
+
+                else: 
+                    data = fetch_data(tableName, x_axis, filter_options, y_axis, aggregate, databaseName,selectedUser)
+                    print("data====================", data)     
+                    categories = {}  
+                    for row in data:
+                        category = tuple(row[:-1])
+                        y_axis_value = row[-1]
+                        if category not in categories:
+                            categories[category] = initial_value(aggregate)
+                        update_category(categories, category, y_axis_value, aggregate)      
+                    labels = [', '.join(category) for category in categories.keys()]  
+                    values = list(categories.values())
+                    print("labels====================", labels)
+                    print("values====================", values)
+                        # return jsonify({"categories": labels, "values": values, "aggregation": aggregation})
+                    
+                        
 
                     # Return the filtered data
                     return jsonify({
                         "message": "Chart details received successfully!",
-                        "categories": filtered_categories,
-                        "values": filtered_values,
+                        "categories": labels,
+                        "values": values,
                         "chart_type": chart_type,
                         "chart_heading": chart_heading,
                         "x_axis": x_axis,

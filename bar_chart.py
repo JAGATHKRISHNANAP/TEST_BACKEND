@@ -399,20 +399,120 @@ def fetch_external_db_connection(db_name,selectedUser):
 #     result = [tuple(x) for x in grouped_df.to_numpy()]
     
 #     return result
+# def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name, selectedUser):
+#     global_df =None
+
+#     if global_df is None:
+#         print("Fetching data from the database...")
+#         try:
+#             # Establish database connection
+#             if not selectedUser or selectedUser.lower() == 'null':
+#                 print("Using default database connection...")
+#                 connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
+#                 conn = psycopg2.connect(connection_string)
+#             else:
+#                 print(f"Using connection for user: {selectedUser}")
+#                 connection_string = fetch_external_db_connection(db_name,selectedUser)
+#                 if not connection_string:
+#                     raise Exception("Unable to fetch external database connection details.")
+
+#                 db_details = {
+#                     "host": connection_string[3],
+#                     "database": connection_string[7],
+#                     "user": connection_string[4],
+#                     "password": connection_string[5],
+#                     "port": int(connection_string[6])
+#                 }
+
+#                 conn = psycopg2.connect(
+#                     dbname=db_details['database'],
+#                     user=db_details['user'],
+#                     password=db_details['password'],
+#                     host=db_details['host'],
+#                     port=db_details['port']
+#                 )
+
+#             cur = conn.cursor()
+#             query = f"SELECT * FROM {table_name}"
+#             cur.execute(query)
+#             data = cur.fetchall()
+#             colnames = [desc[0] for desc in cur.description]
+
+#             # Create a pandas DataFrame from the fetched data
+#             global_df = pd.DataFrame(data, columns=colnames)
+
+#             print("Full DataFrame:")
+#             print(global_df)
+
+#             # Ensure the y-axis column is numeric
+#             if y_axis_column[0] in global_df.columns:
+#                 global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+#                 print(f"Converted {y_axis_column[0]} to numeric values.")
+#             else:
+#                 raise KeyError(f"Column '{y_axis_column[0]}' not found in the table.")
+
+#         except Exception as e:
+#             print(f"Error while fetching data from the database: {e}")
+#             return None
+#         finally:
+#             if 'cur' in locals() and cur:
+#                 cur.close()
+#             if 'conn' in locals() and conn:
+#                 conn.close()
+#     else:
+#         # Ensure the y-axis column is numeric in the existing DataFrame
+#         if y_axis_column[0] in global_df.columns:
+#             global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
+#         else:
+#             print(f"Column '{y_axis_column[0]}' not found in the global DataFrame.")
+#             return None
+
+#     try:
+#         # Define the aggregation function
+#         aggregation_func_map = {
+#             "sum": "sum",
+#             "average": "mean",
+#             "count": "count",
+#             "maximum": "max",
+#             "minimum": "min"
+#         }
+#         aggregation_func = aggregation_func_map.get(aggregation.lower())
+#         if not aggregation_func:
+#             raise ValueError(f"Invalid aggregation type: {aggregation}")
+
+#         # Validate x-axis columns and options
+#         if not x_axis_columns or not y_axis_column:
+#             raise ValueError("x_axis_columns and y_axis_column must not be empty.")
+
+#         if x_axis_columns[0] not in global_df.columns:
+#             raise KeyError(f"Column '{x_axis_columns[0]}' not found in the DataFrame.")
+
+#         # Filter and group the DataFrame
+#         options = [option.strip() for option in checked_option.split(',')]
+#         filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
+#         grouped_df = filtered_df.groupby(x_axis_columns[0]).agg({y_axis_column[0]: aggregation_func}).reset_index()
+
+#         # Convert the grouped DataFrame to a list of tuples
+#         result = [tuple(x) for x in grouped_df.to_numpy()]
+#         return result
+
+#     except Exception as e:
+#         print(f"Error during data processing: {e}")
+#         return No
 def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name, selectedUser):
-    global_df =None
+    global_df = None
 
     if global_df is None:
         print("Fetching data from the database...")
         try:
             # Establish database connection
-            if not selectedUser or selectedUser.lower() == 'null':
+            if not selectedUser or str(selectedUser).lower() == 'null':
                 print("Using default database connection...")
                 connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
                 conn = psycopg2.connect(connection_string)
             else:
                 print(f"Using connection for user: {selectedUser}")
-                connection_string = fetch_external_db_connection(db_name,selectedUser)
+                connection_string = fetch_external_db_connection(db_name, selectedUser)
                 if not connection_string:
                     raise Exception("Unable to fetch external database connection details.")
 
@@ -433,7 +533,7 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
                 )
 
             cur = conn.cursor()
-            query = f"SELECT * FROM {table_name}"
+            query = f"SELECT {', '.join([x_axis_columns[0], y_axis_column[0]])} FROM {table_name}"
             cur.execute(query)
             data = cur.fetchall()
             colnames = [desc[0] for desc in cur.description]
@@ -445,11 +545,12 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
             print(global_df)
 
             # Ensure the y-axis column is numeric
-            if y_axis_column[0] in global_df.columns:
-                global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
-                print(f"Converted {y_axis_column[0]} to numeric values.")
+            y_axis = y_axis_column[0] if isinstance(y_axis_column, list) else y_axis_column
+            if y_axis in global_df.columns:
+                global_df[y_axis] = pd.to_numeric(global_df[y_axis], errors='coerce')
+                print(f"Converted {y_axis} to numeric values.")
             else:
-                raise KeyError(f"Column '{y_axis_column[0]}' not found in the table.")
+                raise KeyError(f"Column '{y_axis}' not found in the table.")
 
         except Exception as e:
             print(f"Error while fetching data from the database: {e}")
@@ -459,13 +560,6 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
                 cur.close()
             if 'conn' in locals() and conn:
                 conn.close()
-    else:
-        # Ensure the y-axis column is numeric in the existing DataFrame
-        if y_axis_column[0] in global_df.columns:
-            global_df[y_axis_column[0]] = pd.to_numeric(global_df[y_axis_column[0]], errors='coerce')
-        else:
-            print(f"Column '{y_axis_column[0]}' not found in the global DataFrame.")
-            return None
 
     try:
         # Define the aggregation function
@@ -476,9 +570,11 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
             "maximum": "max",
             "minimum": "min"
         }
-        aggregation_func = aggregation_func_map.get(aggregation.lower())
-        if not aggregation_func:
+
+        if aggregation.lower() not in aggregation_func_map:
             raise ValueError(f"Invalid aggregation type: {aggregation}")
+
+        aggregation_func = aggregation_func_map[aggregation.lower()]
 
         # Validate x-axis columns and options
         if not x_axis_columns or not y_axis_column:
@@ -488,9 +584,9 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
             raise KeyError(f"Column '{x_axis_columns[0]}' not found in the DataFrame.")
 
         # Filter and group the DataFrame
-        options = [option.strip() for option in checked_option.split(',')]
+        options = checked_option.get(x_axis_columns[0], [])
         filtered_df = global_df[global_df[x_axis_columns[0]].isin(options)]
-        grouped_df = filtered_df.groupby(x_axis_columns[0]).agg({y_axis_column[0]: aggregation_func}).reset_index()
+        grouped_df = filtered_df.groupby(x_axis_columns[0]).agg({y_axis: aggregation_func}).reset_index()
 
         # Convert the grouped DataFrame to a list of tuples
         result = [tuple(x) for x in grouped_df.to_numpy()]
@@ -499,6 +595,7 @@ def edit_fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, a
     except Exception as e:
         print(f"Error during data processing: {e}")
         return None
+
 
 
 import psycopg2
@@ -610,13 +707,13 @@ def count_function(table_name, x_axis_columns, checked_option, y_axis_column, ag
 
 
 
-def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggregation, db_name,selectedUser):
+def fetch_data(table_name, x_axis_columns, filter_options, y_axis_column, aggregation, db_name,selectedUser):
     global global_df
     print("table_name:", table_name)
     print("x_axis_columns:", x_axis_columns)
     print("y_axis_column:", y_axis_column)
     print("aggregation:", aggregation)
-
+    print("aggregation:", filter_options)
     if global_df is None:
         print("Fetching data from the database...")
         if not selectedUser or selectedUser.lower() == 'null':
@@ -657,13 +754,25 @@ def fetch_data(table_name, x_axis_columns, checked_option, y_axis_column, aggreg
     # Create a copy of the necessary data for processing
     temp_df = global_df.copy()
 
+    for col, filters in filter_options.items():
+        if col in temp_df.columns:
+            temp_df[col] = temp_df[col].astype(str)
+            temp_df = temp_df[temp_df[col].isin(filters)]
+
+
     # Convert the x_axis_columns values to strings in the temporary DataFrame
     for col in x_axis_columns:
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str)
 
     x_axis_columns_str = x_axis_columns
-    options = [option.strip() for option in checked_option.split(',')]
+    # options = [option.strip() for option in filter_options.split(',')]
+     # Use filter_options directly, not checked_option
+    options = []
+    for col in x_axis_columns: #added loop here
+        if col in filter_options:
+            options.extend(filter_options[col])
+   
 
     # Convert options to strings for comparison
     options = list(map(str, options))
@@ -739,11 +848,13 @@ def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):
 
 
 
-def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_columns,aggregation,db_nameeee,selectedUser):
+def fetch_data_for_duel(table_name, x_axis_columns,filter_options, y_axis_columns,aggregation,db_nameeee,selectedUser):
     # conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     # cur = conn.cursor()
     # if selectedUser == 'null':
     #     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
+    print("data====================",table_name, x_axis_columns,filter_options, y_axis_columns,aggregation,db_nameeee,selectedUser)
+    print("duelbar====================")
     if not selectedUser or selectedUser.lower() == 'null':
                 print("Using default database connection...")
                 connection_string = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
@@ -770,45 +881,165 @@ def fetch_data_for_duel(table_name, x_axis_columns,checked_option, y_axis_column
         )
     
     cur = conn.cursor()
-    if aggregation == "sum":
-        aggregation = "SUM"
-    elif aggregation == "average":
-        aggregation = "AVG"
-    elif aggregation == "count":
-        aggregation = "COUNT"
-    elif aggregation == "maximum":
-        aggregation = "MAX"
-    elif aggregation == "minimum":
-        aggregation = "MIN"
-        
-    x_axis_columns_str = ', '.join(f'"{column}"' for column in x_axis_columns)
-    options = [option.strip() for option in checked_option.split(',')]
-    placeholders = ','.join(['%s' for _ in options])
-    # query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
-    # Ensure there are at least two columns for y_axis_columns, or handle it appropriately
-    if len(y_axis_columns) == 1:
-        print("y=1")
-        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
+    query = f"SELECT * FROM {table_name}"
+    cur.execute(query)
+    data = cur.fetchall()
+    colnames = [desc[0] for desc in cur.description]
     
-    else:
-        query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]}, {aggregation}(\"{y_axis_columns[1]}\"::numeric) AS {y_axis_columns[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
 
-    print("Constructed Query:", cur.mogrify(query, options).decode('utf-8'))
-    cur.execute(query,options)
+    global_df = pd.DataFrame(data, columns=colnames)
+    print("*********************************************************************************", global_df)
+
+    filter_clause = ""
+    if filter_options:  # Check if filter_options is not empty
+        where_clauses = []
+        for col, filters in filter_options.items():
+            if col in global_df.columns:  # Check if column exists
+                filters_str = ', '.join([f"'{f}'" for f in filters]) #Escape string for SQL query
+                where_clauses.append(f"{col} IN ({filters_str})")
+        if where_clauses: #Check if there is any where clause to add
+            filter_clause = "WHERE " + " AND ".join(where_clauses)
+
+    if aggregation == "sum":
+        agg_func = "SUM"
+    elif aggregation == "average":
+        agg_func = "AVG"
+    elif aggregation == "count":
+        agg_func = "COUNT"
+    elif aggregation == "maximum":
+        agg_func = "MAX"
+    elif aggregation == "minimum":
+        agg_func = "MIN"
+    else:
+        raise ValueError(f"Unsupported aggregation type: {aggregation}")
+
+    x_axis_columns_str = ', '.join(f'"{column}"' for column in x_axis_columns)
+    print("x_axis_columns_str",x_axis_columns_str)
+    if len(y_axis_columns) == 1:
+        # query = f"SELECT {x_axis_columns_str}, {agg_func}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]} FROM {table_name} {filter_clause} GROUP BY {x_axis_columns_str}"
+        query = f"""
+        SELECT {x_axis_columns[0]}, {x_axis_columns[1]}, {agg_func}({y_axis_columns[0]})
+        FROM {table_name}
+        {filter_clause}
+        GROUP BY {x_axis_columns[0]}, {x_axis_columns[1]}
+        ORDER BY {x_axis_columns[0]}, {x_axis_columns[1]};
+        """
+        cur.execute(query)
+        print("query",query)
+        data = cur.fetchall()
+   
+    
+    else:  # Dual y-axis
+        query = f"SELECT {x_axis_columns_str}, {agg_func}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]}, {agg_func}(\"{y_axis_columns[1]}\"::numeric) AS {y_axis_columns[1]} FROM {table_name} {filter_clause} GROUP BY {x_axis_columns_str}"
+
+    print("Constructed Query:", cur.mogrify(query).decode('utf-8')) #No need to pass options here, it is already handled by filter clause
+    cur.execute(query)
     rows = cur.fetchall()
+    print("Rows from database:", rows)
     cur.close()
     conn.close()
     return rows
+    # if aggregation == "sum":
+    #     aggregation = "SUM"
+    # elif aggregation == "average":
+    #     aggregation = "AVG"
+    # elif aggregation == "count":
+    #     aggregation = "COUNT"
+    # elif aggregation == "maximum":
+    #     aggregation = "MAX"
+    # elif aggregation == "minimum":
+    #     aggregation = "MIN"
+        
+    # x_axis_columns_str = ', '.join(f'"{column}"' for column in x_axis_columns)
+    # options = [option.strip() for option in checked_option.split(',')]
+    # placeholders = ','.join(['%s' for _ in options])
+    # # query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_column[0]}\"::numeric) AS {y_axis_column[0]},{aggregation}(\"{y_axis_column[1]}\"::numeric) AS {y_axis_column[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"  
+    # # Ensure there are at least two columns for y_axis_columns, or handle it appropriately
+    # if len(y_axis_columns) == 1:
+    #     print("y=1")
+    #     query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]} FROM {table_name} GROUP BY {x_axis_columns_str}"
+    
+    # else:
+    #     query = f"SELECT {x_axis_columns[0]}, {aggregation}(\"{y_axis_columns[0]}\"::numeric) AS {y_axis_columns[0]}, {aggregation}(\"{y_axis_columns[1]}\"::numeric) AS {y_axis_columns[1]} FROM {table_name} WHERE {x_axis_columns[0]} IN ({placeholders}) GROUP BY {x_axis_columns_str}"
+
+    # print("Constructed Query:", cur.mogrify(query, options).decode('utf-8'))
+    # cur.execute(query,options)
+    # rows = cur.fetchall()
+    # cur.close()
+    # conn.close()
+    # return rows
 
 from psycopg2 import sql
+# def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
+#     print("selectedUser:", selectedUser)
+    
+#     # Connect to the appropriate database based on connection_type
+#     if not selectedUser or selectedUser.lower() == 'null':
+#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+#     else:  # External connection
+#         connection_details = fetch_external_db_connection(db_name,selectedUser)
+#         if connection_details:
+#             db_details = {
+#                 "host": connection_details[3],
+#                 "database": connection_details[7],
+#                 "user": connection_details[4],
+#                 "password": connection_details[5],
+#                 "port": int(connection_details[6])
+#             }
+#         if not connection_details:
+#             raise Exception("Unable to fetch external database connection details.")
+        
+#         conn = psycopg2.connect(
+#             dbname=db_details['database'],
+#             user=db_details['user'],
+#             password=db_details['password'],
+#             host=db_details['host'],
+#             port=db_details['port'],
+#         )
+    
+#     cur = conn.cursor()
+#     type_query = sql.SQL(
+#         "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
+#     )
+#     type_check_query = type_query.format(
+#         table=sql.Literal(table_name),
+#         col=sql.Literal(x_axis_columns)
+#     )
+#     cur.execute(type_check_query)
+#     column_type = cur.fetchone()
+
+#     # Dynamically build the query based on the column type
+#     if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
+#         # Use TO_CHAR for date or timestamp columns
+#         query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
+#     else:
+#         # Directly fetch the column value for other data types
+#         query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
+    
+#     formatted_query = query.format(
+#         col=sql.Identifier(x_axis_columns),
+#         table=sql.Identifier(table_name)
+#     )
+    
+#     cur.execute(formatted_query)
+#     rows = cur.fetchall()
+#     cur.close()
+#     conn.close()
+#     return rows
+
 def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
+    """
+    Fetch distinct values for one or more columns. If multiple columns are provided
+    as a comma-separated string, the function returns a dictionary with each column's
+    distinct values.
+    """
     print("selectedUser:", selectedUser)
     
-    # Connect to the appropriate database based on connection_type
+    # Connect to the appropriate database based on connection type
     if not selectedUser or selectedUser.lower() == 'null':
         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
     else:  # External connection
-        connection_details = fetch_external_db_connection(db_name,selectedUser)
+        connection_details = fetch_external_db_connection(db_name, selectedUser)
         if connection_details:
             db_details = {
                 "host": connection_details[3],
@@ -829,34 +1060,48 @@ def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
         )
     
     cur = conn.cursor()
-    type_query = sql.SQL(
-        "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
-    )
-    type_check_query = type_query.format(
-        table=sql.Literal(table_name),
-        col=sql.Literal(x_axis_columns)
-    )
-    cur.execute(type_check_query)
-    column_type = cur.fetchone()
-
-    # Dynamically build the query based on the column type
-    if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
-        # Use TO_CHAR for date or timestamp columns
-        query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
+    
+    # Determine if we have multiple columns (comma-separated) or just one.
+    if ',' in x_axis_columns:
+        columns = [col.strip() for col in x_axis_columns.split(',')]
     else:
-        # Directly fetch the column value for other data types
-        query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
+        columns = [x_axis_columns.strip()]
     
-    formatted_query = query.format(
-        col=sql.Identifier(x_axis_columns),
-        table=sql.Identifier(table_name)
-    )
+    results = {}
     
-    cur.execute(formatted_query)
-    rows = cur.fetchall()
+    for col in columns:
+        # Check the data type of the column to format date/timestamp types appropriately.
+        type_query = sql.SQL(
+            "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
+        )
+        type_check_query = type_query.format(
+            table=sql.Literal(table_name),
+            col=sql.Literal(col)
+        )
+        cur.execute(type_check_query)
+        column_type = cur.fetchone()
+    
+        # Build the SQL query based on the column type.
+        if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
+            query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
+        else:
+            query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
+    
+        formatted_query = query.format(
+            col=sql.Identifier(col),
+            table=sql.Identifier(table_name)
+        )
+    
+        cur.execute(formatted_query)
+        rows = cur.fetchall()
+        # Convert the returned rows (tuples) to a flat list.
+        results[col] = [row[0] for row in rows]
+    
     cur.close()
     conn.close()
-    return rows
+    
+    # Return a dictionary mapping each column to its distinct values.
+    return results
 # from psycopg2 import sql
 
 # def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
