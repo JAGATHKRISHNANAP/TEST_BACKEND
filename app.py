@@ -1961,8 +1961,8 @@ def dashboard_data(dashboard_name):
         positions=data[5]
         print("chart_ids====================",chart_ids)    
         chart_datas=get_dashboard_view_chart_data(chart_ids,positions)
-        print("dashboarddata",chart_datas)
-        # print("chart_datas====================",chart_datas)
+        print("dashboarddata",data)
+        print("chart_datas====================",chart_datas)
         # return jsonify(data,chart_datas)
         return jsonify({
             "data": data,

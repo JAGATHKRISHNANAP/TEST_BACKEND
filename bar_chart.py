@@ -854,7 +854,7 @@ def fetch_data_for_duel(table_name, x_axis_columns,filter_options, y_axis_column
     # if selectedUser == 'null':
     #     conn = psycopg2.connect(f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}")
     print("data====================",table_name, x_axis_columns,filter_options, y_axis_columns,aggregation,db_nameeee,selectedUser)
-    print("duelbar====================")
+    print("duelbar====================",filter_options)
     if not selectedUser or selectedUser.lower() == 'null':
                 print("Using default database connection...")
                 connection_string = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"

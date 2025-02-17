@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2 import sql
 from flask import jsonify, request
 from config import DB_NAME,USER_NAME,PASSWORD,HOST,PORT
-
+from bar_chart import fetch_data_for_duel 
 from histogram_utils import generate_histogram_details,handle_column_data_types
 
 def create_connection():
@@ -231,6 +231,7 @@ def fetch_external_db_connection(database_name,selected_user):
         return None
 import re  
 import ast
+import json
 def get_dashboard_view_chart_data(chart_ids,positions):
     conn = create_connection()  # Initial connection to your main database
     if conn:
@@ -402,7 +403,7 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             print(f"Converted Time to Minutes for {axis}: ", dataframe[axis].head())
                         except ValueError:
                             dataframe[axis] = pd.to_numeric(dataframe[axis], errors='coerce')
-
+                    
                     # Check if the aggregation type is count
                     if aggregate_py == 'count':
                         print("Aggregate is count", aggregate_py)
@@ -499,6 +500,30 @@ def get_dashboard_view_chart_data(chart_ids,positions):
                             "aggregate": aggregate,
                             "positions": chart_positions.get(chart_id)
                         })
+                    elif chart_type == "duealbarChart":
+                        filter_options = json.loads(filter_options)
+                        datass = fetch_data_for_duel(table_name, x_axis, filter_options, y_axis, aggregate, database_name,selected_user)
+                        print("datass",datass)
+                        # data = {
+                        #     "categories": [row[0] for row in datass],
+                        #     "series1": [row[1] for row in datass],
+                        #     "series2": [row[2] for row in datass],
+                        #     "aggregation": aggregation
+                        # }
+                        chart_data_list.append({
+                            "categories": [row[0] for row in datass],
+                                "series1":[row[1] for row in datass],
+                                "series2": [row[2] for row in datass],
+                                "chart_id": chart_id,
+                                "chart_type": chart_type,
+                                "chart_color": chart_color,
+                                "x_axis": x_axis,
+                                "y_axis": y_axis,
+                                "aggregate": aggregate,
+                                "positions": chart_positions.get(chart_id)
+                            
+                        })
+                       
                     else:
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
                         print("Grouped DataFrame:", grouped_df.head())
