@@ -552,12 +552,14 @@ def get_edit_chart_route():
              "categories": [row[0] for row in datass],
             "series1": [row[1] for row in datass],
             "series2": [row[2] for row in datass],
-            "aggregation": aggregation
+            "aggregation": aggregation,
+            "x_axis_columns":x_axis_columns,
+            "y_axis_columns":y_axis_columns
         }
         print("data====================", data)
         
         return jsonify(data)
-    elif len(y_axis_columns) == 1 :
+    elif len(y_axis_columns) == 1 and chartType != "duealbarChart":
         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         print("data====================", data)     
         categories = {}  

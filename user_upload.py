@@ -742,7 +742,9 @@ def handle_manual_registration(user_details):
 
     except Exception as e:
         print(f"Error during manual registration: {e}")
-        return jsonify({'message': 'Error creating user'}), 500
+         
+        return jsonify({'error': str(e)}), 500  # Proper error response
+        # return jsonify({'message': 'Error creating user'}), 500
 
     finally:
         conn_datasource.close()
