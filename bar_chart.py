@@ -895,7 +895,8 @@ def fetch_data_for_duel(table_name, x_axis_columns,filter_options, y_axis_column
         where_clauses = []
         for col, filters in filter_options.items():
             if col in global_df.columns:  # Check if column exists
-                filters_str = ', '.join([f"'{f}'" for f in filters]) #Escape string for SQL query
+                # filters_str = ', '.join([f"'{f}'" for f in filters]) #Escape string for SQL query
+                filters_str = ', '.join(["'{}'".format(f.replace("'", "''")) for f in filters])
                 where_clauses.append(f"{col} IN ({filters_str})")
         if where_clauses: #Check if there is any where clause to add
             filter_clause = "WHERE " + " AND ".join(where_clauses)
