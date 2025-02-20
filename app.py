@@ -1539,6 +1539,7 @@ def handle_clicked_category():
                     "chart_data_list": chart_data_list})
 
 import json
+import ast
 @app.route('/api/send-chart-details', methods=['POST'])
 def receive_chart_details():
     data = request.json
@@ -1551,7 +1552,9 @@ def receive_chart_details():
     chart_heading = data.get('chart_heading')
     # filter_options = data.get('filter_options').split(', ')  # Convert filter_options string to a list
    
-    filter_options = json.loads(data.get('filter_options').replace("'", '"'))
+    filter_options = ast.literal_eval(data.get('filter_options'))
+
+    # filter_options = json.loads(data.get('filter_options').replace("'", '"'))
     databaseName = data.get('databaseName')
     company_name=data.get('databaseName')
     print("chart_id====================", chart_id)
