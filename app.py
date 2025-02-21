@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from excel_upload import upload_excel_to_postgresql
 from csv_upload import upload_csv_to_postgresql
 from dashboard_design import get_database_table_names
-from bar_chart import fetch_data ,drill_down,fetch_column_name ,calculationFetch,fetch_data_for_duel ,perform_calculation,get_column_names,fetchText_data,edit_fetch_data,fetch_hierarchical_data,Hierarchial_drill_down
+from bar_chart import fetch_data_tree, fetch_data ,drill_down,fetch_column_name ,calculationFetch,fetch_data_for_duel ,perform_calculation,get_column_names,fetchText_data,edit_fetch_data,fetch_hierarchical_data,Hierarchial_drill_down
 import traceback
 from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
 import bar_chart as bc
@@ -421,6 +421,39 @@ def get_bar_chart_route():
     except ValueError:
         # If conversion fails, it is not in time format
         print(f"{y_axis_columns[0]} is not in time format. No conversion applied.")
+    if chart_data == "treeHierarchy" and len(x_axis_columns) > 0 :  # Tree Hierarchy logic
+        try:
+            # Prepare data for tree hierarchy
+            categories = []
+            values = []
+
+            # Assuming your data is already filtered and ready in 'new_df'
+            # Adjust this section based on how you want to structure your tree data.
+
+            # Example: Assuming x_axis_columns define the hierarchy levels and 
+            # the first y_axis_columns is the value.
+            for index, row in new_df.iterrows():
+                category = {}
+                for col in x_axis_columns:
+                    category[col] = row[col] #creates hierarchy based on the column names provided in the x axis
+                categories.append(category)
+                if y_axis_columns:
+                    values.append(row[y_axis_columns[0]])  # Append the value
+                else:
+                    values.append(1) # if no yaxis is given then just count the number of occurences
+                print("categories:", categories)
+                print("values:", values)
+                print("df_json:", df_json)
+            return jsonify({
+                "categories": categories,
+                "values": values,
+                "chartType": "treeHierarchy",
+                "dataframe": df_json
+            })
+
+        except Exception as e:
+            print("Error preparing Tree Hierarchy data:", e)
+            return jsonify({"error": str(e)})
 
     if len(y_axis_columns) == 1:
         # data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
@@ -1910,24 +1943,51 @@ def receive_chart_details():
                         "x_axis": x_axis,
                     }), 200
         else:
-            # Logic for 'treeHierarchy' chart type
-            filtered_categories = []
-            filtered_values = []
-            print("No grouping or conversion for treeHierarchy chart type.")
-
-            connection.close()
-            dataframe_dict = df.to_dict(orient='records')
-            print("df_json====================", dataframe_dict)
-
+            data = fetch_data_tree(tableName, x_axis, filter_options, y_axis, aggregate, databaseName,selectedUser)
+            categories = data.get("categories", [])
+            values = data.get("values", [])
+            print("categories",categories)
+            print("values",values)
+            # Return the filtered data
             return jsonify({
                 "message": "Chart details received successfully!",
-                "categories": filtered_categories,
-                "values": filtered_values,
+                "categories": categories,
+                "values": values,
                 "chart_type": chart_type,
                 "chart_heading": chart_heading,
                 "x_axis": x_axis,
-                "data frame": dataframe_dict,
             }), 200
+    #         categories = []
+    #         values = []
+
+    #         for index, row in df.iterrows(): #use df directly instead of new_df
+    #             category = {}
+    #             for col in x_axis:  # Use x_axis directly
+    #                 category[col] = row[col]
+    #             categories.append(category)
+
+    #             if y_axis: #check if y_axis is not None or empty
+    #                 values.append(row[y_axis[0]])  # Use y_axis[0] directly
+    #             else:
+    #                 values.append(1)  # if no yaxis is given then just count the number of occurences
+
+    #         print("categories:", categories)
+    #         print("values:", values)
+    #         print("df_json:", df.to_dict(orient='records')) #convert df to json
+
+    #         connection.close() #Close connection after processing.
+
+    #         return jsonify({
+    #                 "categories": categories,
+    #                 "values": values,
+    #                 "chartType": "treeHierarchy",
+    #                 "dataframe": df.to_dict(orient='records')  # Send the DataFrame as JSON
+    #         }), 200
+
+    # except Exception as e:
+    #     print("Error preparing Tree Hierarchy data:", e)
+    #     connection.close() # close connection in the except block as well.
+    #     return jsonify({"error": str(e)}), 500
 
     except Exception as e:
         print("Error: ", e)
