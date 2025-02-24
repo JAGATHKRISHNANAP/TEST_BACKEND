@@ -421,39 +421,71 @@ def get_bar_chart_route():
     except ValueError:
         # If conversion fails, it is not in time format
         print(f"{y_axis_columns[0]} is not in time format. No conversion applied.")
-    if chart_data == "treeHierarchy" and len(x_axis_columns) > 0 :  # Tree Hierarchy logic
+    # if chart_data == "treeHierarchy" and len(x_axis_columns) > 0 :  # Tree Hierarchy logic
+    #     try:
+    #         # Prepare data for tree hierarchy
+    #         categories = []
+    #         values = []
+
+    #         # Assuming your data is already filtered and ready in 'new_df'
+    #         # Adjust this section based on how you want to structure your tree data.
+
+    #         # Example: Assuming x_axis_columns define the hierarchy levels and 
+    #         # the first y_axis_columns is the value.
+    #         for index, row in new_df.iterrows():
+    #             category = {}
+    #             for col in x_axis_columns:
+    #                 category[col] = row[col] #creates hierarchy based on the column names provided in the x axis
+    #             categories.append(category)
+    #             if y_axis_columns:
+    #                 values.append(row[y_axis_columns[0]])  # Append the value
+    #             else:
+    #                 values.append(1) # if no yaxis is given then just count the number of occurences
+    #             print("categories:", categories)
+    #             print("values:", values)
+    #             print("df_json:", df_json)
+    #         return jsonify({
+    #             "categories": categories,
+    #             "values": values,
+    #             "chartType": "treeHierarchy",
+    #             "dataframe": df_json
+    #         })
+
+    #     except Exception as e:
+    #         print("Error preparing Tree Hierarchy data:", e)
+    #         return jsonify({"error": str(e)})
+    if chart_data == "treeHierarchy" and len(x_axis_columns) > 0:  # Tree Hierarchy logic
         try:
+            # Check if we need aggregation
+            if aggregation and y_axis_columns:
+                if aggregation == "sum":
+                    new_df = new_df.groupby(x_axis_columns, as_index=False)[y_axis_columns[0]].sum()
+                elif aggregation == "count":
+                    new_df = new_df.groupby(x_axis_columns, as_index=False)[y_axis_columns[0]].count()
+                elif aggregation == "mean":
+                    new_df = new_df.groupby(x_axis_columns, as_index=False)[y_axis_columns[0]].mean()
+                else:
+                    return jsonify({"error": f"Unsupported aggregation type: {aggregation}"})
+            
             # Prepare data for tree hierarchy
             categories = []
             values = []
 
-            # Assuming your data is already filtered and ready in 'new_df'
-            # Adjust this section based on how you want to structure your tree data.
-
-            # Example: Assuming x_axis_columns define the hierarchy levels and 
-            # the first y_axis_columns is the value.
             for index, row in new_df.iterrows():
-                category = {}
-                for col in x_axis_columns:
-                    category[col] = row[col] #creates hierarchy based on the column names provided in the x axis
+                category = {col: row[col] for col in x_axis_columns}  # Hierarchy levels
                 categories.append(category)
-                if y_axis_columns:
-                    values.append(row[y_axis_columns[0]])  # Append the value
-                else:
-                    values.append(1) # if no yaxis is given then just count the number of occurences
-                print("categories:", categories)
-                print("values:", values)
-                print("df_json:", df_json)
+                values.append(row[y_axis_columns[0]] if y_axis_columns else 1)  # Use aggregated value
+
             return jsonify({
                 "categories": categories,
                 "values": values,
                 "chartType": "treeHierarchy",
-                "dataframe": df_json
             })
 
         except Exception as e:
             print("Error preparing Tree Hierarchy data:", e)
             return jsonify({"error": str(e)})
+
 
     if len(y_axis_columns) == 1:
         # data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)

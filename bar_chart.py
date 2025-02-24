@@ -808,6 +808,117 @@ def fetch_data(table_name, x_axis_columns, filter_options, y_axis_column, aggreg
     result = [tuple(x) for x in grouped_df.to_numpy()]
     print("result:", result)
     return result
+# import json
+# def fetch_data_tree(table_name, x_axis_columns, filter_options, y_axis_column, aggregation, db_name, selectedUser):
+#     global global_df
+#     print("table_name:", table_name)
+#     print("x_axis_columns:", x_axis_columns)
+#     print("y_axis_column:", y_axis_column)
+#     print("aggregation:", aggregation)
+#     print("filter_options:", filter_options)
+
+#     try:
+#         if isinstance(filter_options, str):
+#             try:
+#                 filter_options = json.loads(filter_options)
+#             except json.JSONDecodeError:
+#                 raise ValueError("filter_options must be a valid JSON object")
+
+#         if not isinstance(filter_options, dict):
+#             raise ValueError("filter_options should be a dictionary")
+#         if global_df is None:
+#             print("Fetching data from the database...")
+#             if not selectedUser or selectedUser.lower() == 'null':
+#                 print("Using default database connection...")
+#                 connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
+#                 connection = psycopg2.connect(connection_string)
+#             else:  # External connection
+#                 connection_details = fetch_external_db_connection(db_name, selectedUser)
+#                 if not connection_details:
+#                     raise Exception("Unable to fetch external database connection details.")
+
+#                 db_details = {
+#                     "host": connection_details[3],
+#                     "database": connection_details[7],
+#                     "user": connection_details[4],
+#                     "password": connection_details[5],
+#                     "port": int(connection_details[6])
+#                 }
+#                 connection = psycopg2.connect(
+#                     dbname=db_details['database'],
+#                     user=db_details['user'],
+#                     password=db_details['password'],
+#                     host=db_details['host'],
+#                     port=db_details['port'],
+#                 )
+
+#             cur = connection.cursor()
+#             query = f"SELECT * FROM {table_name}"
+#             cur.execute(query)
+#             data = cur.fetchall()
+#             colnames = [desc[0] for desc in cur.description]
+#             cur.close()
+#             connection.close()
+
+#             global_df = pd.DataFrame(data, columns=colnames)
+#             print("*********************************************************************************", global_df)
+
+#         # Create a copy of the necessary data for processing
+#         temp_df = global_df.copy()
+
+#         # Apply filters
+#         for col, filters in filter_options.items():
+#             if col in temp_df.columns:
+#                 temp_df[col] = temp_df[col].astype(str)
+#                 temp_df = temp_df[temp_df[col].isin(filters)]
+
+#         # Convert x_axis_columns values to strings
+#         for col in x_axis_columns:
+#             if col in temp_df.columns:
+#                 temp_df[col] = temp_df[col].astype(str)
+
+#         # Prepare options for filtering
+#         options = []
+#         for col in x_axis_columns:
+#             if col in filter_options:
+#                 options.extend(filter_options[col])
+#         options = list(map(str, options))
+
+#         # Filter DataFrame
+#         filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
+#         print("filtered_df:", filtered_df)
+        
+#         # Prepare categories and values for response
+#         categories = []
+#         values = []
+
+#         for index, row in filtered_df.iterrows():
+#             category = {col: row[col] for col in x_axis_columns}  # Use x_axis_columns directly
+#             categories.append(category)
+
+#             if y_axis_column:  # Check if y_axis_column is not None or empty
+#                 values.append(row[y_axis_column[0]])  # Use y_axis_column[0] directly
+#             else:
+#                 values.append(1)  # If no y-axis is given, count occurrences
+
+#         result = {
+#             "categories": categories,
+#             "values": values,
+#             "chartType": "treeHierarchy",
+#             "dataframe": filtered_df.to_dict(orient='records')  # Send the DataFrame as JSON
+#         }
+
+#         print("result:", result)
+#         return result
+
+#     except Exception as e:
+#         print("Error preparing Tree Hierarchy data:", e)
+#         return {"error": str(e)}
+
+
+import json
+import pandas as pd
+import psycopg2
 
 def fetch_data_tree(table_name, x_axis_columns, filter_options, y_axis_column, aggregation, db_name, selectedUser):
     global global_df
@@ -818,13 +929,22 @@ def fetch_data_tree(table_name, x_axis_columns, filter_options, y_axis_column, a
     print("filter_options:", filter_options)
 
     try:
+        if isinstance(filter_options, str):
+            try:
+                filter_options = json.loads(filter_options)
+            except json.JSONDecodeError:
+                raise ValueError("filter_options must be a valid JSON object")
+
+        if not isinstance(filter_options, dict):
+            raise ValueError("filter_options should be a dictionary")
+
         if global_df is None:
             print("Fetching data from the database...")
             if not selectedUser or selectedUser.lower() == 'null':
                 print("Using default database connection...")
                 connection_string = f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}"
                 connection = psycopg2.connect(connection_string)
-            else:  # External connection
+            else:
                 connection_details = fetch_external_db_connection(db_name, selectedUser)
                 if not connection_details:
                     raise Exception("Unable to fetch external database connection details.")
@@ -878,6 +998,22 @@ def fetch_data_tree(table_name, x_axis_columns, filter_options, y_axis_column, a
 
         # Filter DataFrame
         filtered_df = temp_df[temp_df[x_axis_columns[0]].isin(options)]
+
+        # **Apply Aggregation**
+        if y_axis_column and aggregation and y_axis_column[0] in filtered_df.columns:
+            if aggregation.lower() == "sum":
+                filtered_df = filtered_df.groupby(x_axis_columns, as_index=False)[y_axis_column[0]].sum()
+            elif aggregation.lower() == "avg":
+                filtered_df = filtered_df.groupby(x_axis_columns, as_index=False)[y_axis_column[0]].mean()
+            elif aggregation.lower() == "min":
+                filtered_df = filtered_df.groupby(x_axis_columns, as_index=False)[y_axis_column[0]].min()
+            elif aggregation.lower() == "max":
+                filtered_df = filtered_df.groupby(x_axis_columns, as_index=False)[y_axis_column[0]].max()
+            elif aggregation.lower() == "count":
+                filtered_df = filtered_df.groupby(x_axis_columns, as_index=False)[y_axis_column[0]].count()
+            else:
+                raise ValueError("Unsupported aggregation type. Use 'sum', 'avg', 'min', 'max', or 'count'.")
+
         print("filtered_df:", filtered_df)
 
         # Prepare categories and values for response
@@ -885,19 +1021,19 @@ def fetch_data_tree(table_name, x_axis_columns, filter_options, y_axis_column, a
         values = []
 
         for index, row in filtered_df.iterrows():
-            category = {col: row[col] for col in x_axis_columns}  # Use x_axis_columns directly
+            category = {col: row[col] for col in x_axis_columns}
             categories.append(category)
 
-            if y_axis_column:  # Check if y_axis_column is not None or empty
-                values.append(row[y_axis_column[0]])  # Use y_axis_column[0] directly
+            if y_axis_column:
+                values.append(row[y_axis_column[0]])
             else:
-                values.append(1)  # If no y-axis is given, count occurrences
+                values.append(1)
 
         result = {
             "categories": categories,
             "values": values,
             "chartType": "treeHierarchy",
-            "dataframe": filtered_df.to_dict(orient='records')  # Send the DataFrame as JSON
+            "dataframe": filtered_df.to_dict(orient='records')
         }
 
         print("result:", result)
@@ -906,8 +1042,6 @@ def fetch_data_tree(table_name, x_axis_columns, filter_options, y_axis_column, a
     except Exception as e:
         print("Error preparing Tree Hierarchy data:", e)
         return {"error": str(e)}
-
-
 
 
 def drill_down(clicked_category, x_axis_columns, y_axis_column, aggregation):

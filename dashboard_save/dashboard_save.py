@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2 import sql
 from flask import jsonify, request
 from config import DB_NAME,USER_NAME,PASSWORD,HOST,PORT
-from bar_chart import fetch_data_for_duel 
+from bar_chart import fetch_data_for_duel ,fetch_data_tree
 from histogram_utils import generate_histogram_details,handle_column_data_types
 
 def create_connection():
@@ -445,26 +445,33 @@ def get_dashboard_view_chart_data(chart_ids,positions):
 
                     
                     if chart_type == "treeHierarchy":
-                        # No grouping or transformation needed for this chart type
-                        filtered_categories = []
-                        filtered_values = []
-                        print("No grouping or conversion for treeHierarchy chart type.")
-                        
-                        connection.close()  # Ensure DB connection is closed
-                        dataframe_dict = df.to_dict(orient='records')  # Convert DataFrame to JSON
-                        print("df_json====================", dataframe_dict)
-
-                        return jsonify({
-                            "message": "Chart details received successfully!",
-                            "categories": filtered_categories,
-                            "values": filtered_values,
-                            "chart_type": chart_type,
-                            "chart_color": chart_color,
-                            "chart_heading": chart_heading,
-                            "x_axis": x_axis,
-                            "data_frame": dataframe_dict,
-                            "positions": chart_positions.get(chart_id)
-                        }), 200
+                        data = fetch_data_tree(table_name, x_axis, filter_options, y_axis, aggregate, database_name,selected_user)
+                        categories = data.get("categories", [])
+                        values = data.get("values", [])
+                        print("categories",categories)
+                        print("values",values)
+                        chart_data_list.append({
+                                "categories": categories,
+                                "values": values,
+                                "chart_id": chart_id,
+                                "chart_type": chart_type,
+                                "chart_color": chart_color,
+                                "x_axis": x_axis,
+                                "y_axis": y_axis,
+                                "aggregate": aggregate,
+                                "positions": chart_positions.get(chart_id)
+                            })
+                        # return jsonify({
+                        #     "message": "Chart details received successfully!",
+                        #     "categories": filtered_categories,
+                        #     "values": filtered_values,
+                        #     "chart_type": chart_type,
+                        #     "chart_color": chart_color,
+                        #     "chart_heading": chart_heading,
+                        #     "x_axis": x_axis,
+                        #     "data_frame": dataframe_dict,
+                        #     "positions": chart_positions.get(chart_id)
+                        # }), 200
                     # Handle dual y_axis columns
                     elif chart_type == "duealChart":
                         grouped_df = dataframe.groupby(x_axis)[y_axis].agg(aggregate_py).reset_index()
