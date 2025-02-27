@@ -753,7 +753,8 @@ def fetch_data(table_name, x_axis_columns, filter_options, y_axis_column, aggreg
 
     # Create a copy of the necessary data for processing
     temp_df = global_df.copy()
-
+    if isinstance(filter_options, str):
+        filter_options = json.loads(filter_options)
     for col, filters in filter_options.items():
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str)
@@ -1259,20 +1260,99 @@ from psycopg2 import sql
 #     conn.close()
 #     return rows
 
+# def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
+#     """
+#     Fetch distinct values for one or more columns. If multiple columns are provided
+#     as a comma-separated string, the function returns a dictionary with each column's
+#     distinct values.
+#     """
+#     print("selectedUser:", selectedUser)
+    
+#     # Connect to the appropriate database based on connection type
+#     if not selectedUser or selectedUser.lower() == 'null':
+#         conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+#     else:  # External connection
+#         connection_details = fetch_external_db_connection(db_name, selectedUser)
+#         if connection_details:
+#             db_details = {
+#                 "host": connection_details[3],
+#                 "database": connection_details[7],
+#                 "user": connection_details[4],
+#                 "password": connection_details[5],
+#                 "port": int(connection_details[6])
+#             }
+#         if not connection_details:
+#             raise Exception("Unable to fetch external database connection details.")
+        
+#         conn = psycopg2.connect(
+#             dbname=db_details['database'],
+#             user=db_details['user'],
+#             password=db_details['password'],
+#             host=db_details['host'],
+#             port=db_details['port'],
+#         )
+    
+#     cur = conn.cursor()
+    
+#     # Determine if we have multiple columns (comma-separated) or just one.
+#     if ',' in x_axis_columns:
+#         columns = [col.strip() for col in x_axis_columns.split(',')]
+#     else:
+#         columns = [x_axis_columns.strip()]
+    
+#     results = {}
+    
+#     for col in columns:
+#         # Check the data type of the column to format date/timestamp types appropriately.
+#         type_query = sql.SQL(
+#             "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
+#         )
+#         type_check_query = type_query.format(
+#             table=sql.Literal(table_name),
+#             col=sql.Literal(col)
+#         )
+#         cur.execute(type_check_query)
+#         column_type = cur.fetchone()
+    
+#         # Build the SQL query based on the column type.
+#         if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
+#             query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
+#         else:
+#             query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
+    
+#         formatted_query = query.format(
+#             col=sql.Identifier(col),
+#             table=sql.Identifier(table_name)
+#         )
+    
+#         cur.execute(formatted_query)
+#         rows = cur.fetchall()
+#         # Convert the returned rows (tuples) to a flat list.
+#         results[col] = [row[0] for row in rows]
+    
+#     cur.close()
+#     conn.close()
+    
+#     # Return a dictionary mapping each column to its distinct values.
+#     return results
+
 def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
     """
-    Fetch distinct values for one or more columns. If multiple columns are provided
-    as a comma-separated string, the function returns a dictionary with each column's
-    distinct values.
+    Fetch distinct values for one or more columns.
+    If multiple columns are provided as a comma-separated string,
+    returns a dictionary with each column's distinct values.
     """
     print("selectedUser:", selectedUser)
-    
-    # Connect to the appropriate database based on connection type
-    if not selectedUser or selectedUser.lower() == 'null':
-        conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
-    else:  # External connection
-        connection_details = fetch_external_db_connection(db_name, selectedUser)
-        if connection_details:
+
+    # Establish database connection
+    try:
+        if not selectedUser or selectedUser.lower() == 'null':
+            conn = psycopg2.connect(f"dbname={db_name} user={USER_NAME} password={PASSWORD} host={HOST}")
+        else:
+            connection_details = fetch_external_db_connection(db_name, selectedUser)
+            if not connection_details:
+                raise Exception("Unable to fetch external database connection details.")
+            
             db_details = {
                 "host": connection_details[3],
                 "database": connection_details[7],
@@ -1280,60 +1360,51 @@ def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):
                 "password": connection_details[5],
                 "port": int(connection_details[6])
             }
-        if not connection_details:
-            raise Exception("Unable to fetch external database connection details.")
-        
-        conn = psycopg2.connect(
-            dbname=db_details['database'],
-            user=db_details['user'],
-            password=db_details['password'],
-            host=db_details['host'],
-            port=db_details['port'],
-        )
-    
-    cur = conn.cursor()
-    
-    # Determine if we have multiple columns (comma-separated) or just one.
-    if ',' in x_axis_columns:
-        columns = [col.strip() for col in x_axis_columns.split(',')]
-    else:
-        columns = [x_axis_columns.strip()]
-    
-    results = {}
-    
-    for col in columns:
-        # Check the data type of the column to format date/timestamp types appropriately.
-        type_query = sql.SQL(
-            "SELECT data_type FROM information_schema.columns WHERE table_name = {table} AND column_name = {col}"
-        )
-        type_check_query = type_query.format(
-            table=sql.Literal(table_name),
-            col=sql.Literal(col)
-        )
-        cur.execute(type_check_query)
-        column_type = cur.fetchone()
-    
-        # Build the SQL query based on the column type.
-        if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
-            query = sql.SQL("SELECT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table} GROUP BY {col}")
-        else:
-            query = sql.SQL("SELECT {col} FROM {table} GROUP BY {col}")
-    
-        formatted_query = query.format(
-            col=sql.Identifier(col),
-            table=sql.Identifier(table_name)
-        )
-    
-        cur.execute(formatted_query)
-        rows = cur.fetchall()
-        # Convert the returned rows (tuples) to a flat list.
-        results[col] = [row[0] for row in rows]
-    
-    cur.close()
-    conn.close()
-    
-    # Return a dictionary mapping each column to its distinct values.
-    return results
+            conn = psycopg2.connect(
+                dbname=db_details['database'],
+                user=db_details['user'],
+                password=db_details['password'],
+                host=db_details['host'],
+                port=db_details['port'],
+            )
+
+        results = {}
+
+        with conn.cursor() as cur:  # ✅ Use a regular cursor instead of a named cursor
+            # Split multiple columns if needed
+            columns = [col.strip() for col in x_axis_columns.split(',')] if ',' in x_axis_columns else [x_axis_columns.strip()]
+            
+            for col in columns:
+                # Check the data type of the column
+                type_query = """
+                    SELECT data_type FROM information_schema.columns 
+                    WHERE table_name = %s AND column_name = %s
+                """
+                cur.execute(type_query, (table_name, col))
+                column_type = cur.fetchone()
+
+                # Build the SQL query dynamically based on data type
+                if column_type and column_type[0] in ('date', 'timestamp', 'timestamp with time zone'):
+                    query = sql.SQL("SELECT DISTINCT TO_CHAR({col}, 'YYYY-MM-DD') FROM {table}")
+                else:
+                    query = sql.SQL("SELECT DISTINCT {col} FROM {table}")
+
+                formatted_query = query.format(
+                    col=sql.Identifier(col),
+                    table=sql.Identifier(table_name)
+                )
+
+                cur.execute(formatted_query)
+                rows = cur.fetchall()
+
+                # Convert results to a flat list
+                results[col] = [row[0] for row in rows]
+
+        conn.close()
+        return results
+
+    except Exception as e:
+        raise Exception(f"Error fetching distinct column values from {table_name}: {str(e)}")
 # from psycopg2 import sql
 
 # def fetch_column_name(table_name, x_axis_columns, db_name, selectedUser='null'):

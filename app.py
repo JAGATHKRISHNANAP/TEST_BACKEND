@@ -313,17 +313,30 @@ def get_bar_chart_route():
     # connection_path = f"dbname={db_nameeee} user={USER_NAME} password={PASSWORD} host={HOST}"
     database_con = psycopg2.connect(connection_path)
     print("database_con",connection_path)
-    new_df=fetch_chart_data(database_con, table_name)
+    # new_df=fetch_chart_data(database_con, table_name)
+    # print("new_df====================", new_df)
+
+    # if df.equals(new_df):
+    #     print("Both DataFrames are equal")
+    # else:
+        
+    #     print("DataFrames are not equal")
+    #     bc.global_df = new_df
+    # df_json = df.to_json(orient='split')
+
+    new_df = fetch_chart_data(database_con, table_name)
     print("new_df====================", new_df)
 
-    if df.equals(new_df):
+    if new_df is None:  # Handle None case
+        print("Error: fetch_chart_data returned None")
+        return jsonify({"error": "Failed to fetch data"}), 500
+
+    if df.equals(new_df):  # This now runs only if new_df is valid
         print("Both DataFrames are equal")
     else:
-        
         print("DataFrames are not equal")
         bc.global_df = new_df
     df_json = df.to_json(orient='split')
-
     print("df",df)
     print("y_axis_columns====================", y_axis_columns)
     print("db_nameeee====================", db_nameeee)
@@ -624,6 +637,38 @@ def get_edit_chart_route():
         print("data====================", data)
         
         return jsonify(data)
+    elif chart_data == "treeHierarchy" and len(x_axis_columns) > 0:  # Tree Hierarchy logic
+        try:
+            # Check if we need aggregation
+            if aggregation and y_axis_columns:
+                if aggregation == "sum":
+                    new_df = new_df.groupby(x_axis_columns, as_index=False)[y_axis_columns[0]].sum()
+                elif aggregation == "count":
+                    new_df = new_df.groupby(x_axis_columns, as_index=False)[y_axis_columns[0]].count()
+                elif aggregation == "mean":
+                    new_df = new_df.groupby(x_axis_columns, as_index=False)[y_axis_columns[0]].mean()
+                else:
+                    return jsonify({"error": f"Unsupported aggregation type: {aggregation}"})
+            
+            # Prepare data for tree hierarchy
+            categories = []
+            values = []
+
+            for index, row in new_df.iterrows():
+                category = {col: row[col] for col in x_axis_columns}  # Hierarchy levels
+                categories.append(category)
+                values.append(row[y_axis_columns[0]] if y_axis_columns else 1)  # Use aggregated value
+
+            return jsonify({
+                "categories": categories,
+                "values": values,
+                "chartType": "treeHierarchy",
+            })
+
+        except Exception as e:
+            print("Error preparing Tree Hierarchy data:", e)
+            return jsonify({"error": str(e)})
+
     elif len(y_axis_columns) == 1 and chartType != "duealbarChart":
         data = fetch_data(table_name, x_axis_columns, checked_option, y_axis_columns, aggregation, db_nameeee,selectedUser)
         print("data====================", data)     

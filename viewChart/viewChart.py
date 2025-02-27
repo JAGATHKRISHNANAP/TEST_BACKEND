@@ -27,33 +27,66 @@ def get_db_connection_view(database_name):
     return connection
 
 
+# def fetch_chart_data(connection, tableName, limit=1000, offset=0):
+#     try:
+#         print('connection',connection)
+#         cursor = connection.cursor()
+#         print('curs',cursor)
+#         # Use SQL composition to safely query using dynamic table and column names
+#         # query = sql.SQL("SELECT * FROM {table}")
+#         # query = query.format(
+#         #     table=sql.Identifier(tableName)
+#         # )
+#         query = sql.SQL("SELECT * FROM {} LIMIT %s OFFSET %s").format(sql.Identifier(tableName))
+
+#         cursor.execute(query, (limit, offset))
+
+#         # cursor.execute(query)
+#         results = cursor.fetchall()
+
+#         # Fetch the column names from the cursor
+#         column_names = [desc[0] for desc in cursor.description]
+#         print("colum",column_names)
+#         # Convert the results to a DataFrame with the column names
+#         df = pd.DataFrame(results, columns=column_names)
+
+#         cursor.close()
+
+#         return df
+
+#     except Exception as e:
+#         raise Exception(f"Error fetching data from {tableName}: {str(e)}")
+import psycopg2
+import pandas as pd
+from psycopg2 import sql
+
 def fetch_chart_data(connection, tableName):
     try:
-        print('connection',connection)
-        cursor = connection.cursor()
-        print('curs',cursor)
-        # Use SQL composition to safely query using dynamic table and column names
-        query = sql.SQL("SELECT * FROM {table}")
-        query = query.format(
-            table=sql.Identifier(tableName)
-        )
+        print(f"Fetching data from table: {tableName}")
 
-        cursor.execute(query)
-        results = cursor.fetchall()
+        with connection.cursor(name="large_data_cursor") as cursor:
+            query = sql.SQL("SELECT * FROM {table}").format(
+                table=sql.Identifier(tableName)
+            )
 
-        # Fetch the column names from the cursor
-        column_names = [desc[0] for desc in cursor.description]
-        print("colum",column_names)
-        # Convert the results to a DataFrame with the column names
-        df = pd.DataFrame(results, columns=column_names)
+            cursor.execute(query)
+            results = cursor.fetchall()
 
-        cursor.close()
+            if not results:  # Check for empty result
+                print(f"Table '{tableName}' is empty.")
+                return pd.DataFrame()  # Return an empty DataFrame instead of None
+
+            column_names = [desc[0] for desc in cursor.description]
+
+            print("Columns:", column_names)
+
+            df = pd.DataFrame(results, columns=column_names)
 
         return df
 
     except Exception as e:
-        raise Exception(f"Error fetching data from {tableName}: {str(e)}")
-    
+        print("Error fetching chart data:", e)
+        return pd.DataFrame()  # Return an empty DataFrame instead of None
 
 def fetch_AI_chart_data(connection, tableName):
     try:
