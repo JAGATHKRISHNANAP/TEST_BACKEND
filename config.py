@@ -23,7 +23,5 @@ USER_NAME = 'postgres'
 PASSWORD = 'jaTHU@12'
 HOST = 'localhost'
 # HOST = '43.204.149.125'
-
-
 PORT = '5432'
 AUDIO_DATABASE_NAME = 'audio_database'

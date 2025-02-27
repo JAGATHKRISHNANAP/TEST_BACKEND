@@ -1,28 +1,36 @@
 # 24-12-2024 updated
 import os
-from flask_cors import CORS
+
 import json
+import traceback
+import bar_chart as bc
+import psycopg2
+import pandas as pd
+import logging
+import uuid
+import datetime
+import jwt
+
+from flask_cors import CORS
 from flask import Flask, request, jsonify,session
 from werkzeug.utils import secure_filename
 from excel_upload import upload_excel_to_postgresql
 from csv_upload import upload_csv_to_postgresql
 from dashboard_design import get_database_table_names
 from bar_chart import fetch_data ,drill_down,fetch_column_name ,calculationFetch,fetch_data_for_duel ,perform_calculation,get_column_names,fetchText_data,edit_fetch_data,fetch_hierarchical_data,Hierarchial_drill_down
-import traceback
-import bar_chart as bc
 from dashboard_save.dashboard_save import insert_combined_chart_details, create_dashboard_table, create_connection,get_dashboard_names,get_dashboard_view_chart_data
 from signup.signup import insert_user_data,fetch_usersdata,fetch_login_data,connect_db,create_user_table,encrypt_password,fetch_company_login_data
-import psycopg2
 from audio import allowed_file,transcribe_audio_with_timestamps,save_file_to_db
 from histogram_utils import generate_histogram_details,handle_column_data_types
 from json_upload import upload_json_to_postgresql
 from config import  ALLOWED_EXTENSIONS,DB_NAME,USER_NAME,PASSWORD,HOST,PORT
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
-import pandas as pd
-import logging
+
+from functools import wraps
+
 from flask_session import Session  # Flask-Session for server-side session handling
-import uuid
+
 from viewChart.viewChart import get_db_connection_view, fetch_chart_data,filter_chart_data,fetch_ai_saved_chart_data
 from user_upload import handle_manual_registration, handle_file_upload_registration, get_db_connection
 from ai_charts import analyze_data
@@ -56,11 +64,39 @@ port = PORT
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads', 'audio')
 company_name=None
 
-app.config['SECRET_KEY'] =b'y\xd8\x9e\xa6a\xe0\x8eK\x02L\x14@\x0f\x03\xab\x8e\xae\x1d\tB\xbc\xfbL\xcc'
+# app.config['SECRET_KEY'] =b'y\xd8\x9e\xa6a\xe0\x8eK\x02L\x14@\x0f\x03\xab\x8e\xae\x1d\tB\xbc\xfbL\xcc'
 app.config['SESSION_TYPE'] = 'filesystem'  # Store sessions on the server
-
+app.config['SECRET_KEY'] = 'c76d60ed3a260575e897a1eddaf536a36c90d8bdf7de4cc568d065b28d07be81'
 Session(app)
 
+
+
+# Helper function to generate JWT token
+def generate_jwt_token(user_id, role):
+    payload = {
+        'user_id': user_id,
+        'role': role,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=2)  # Token expires in 2 hours
+    }
+    token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+    return token
+
+# JWT Token Required Decorator
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+        try:
+            token = token.split(" ")[1]  # Extract token from "Bearer <token>"
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired!'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Invalid token!'}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 
 @app.route('/', methods=['GET'])
@@ -1452,13 +1488,16 @@ def list_csv_files():
 @app.route('/save_all_chart_details', methods=['POST'])
 def save_all_chart_details():
     data = request.get_json()
+    print("data=============================================================================", data)
     user_id=data['user_id']
     charts = data['charts']
     print("user_id====================", user_id)
     dashboardfilterXaxis = data['dashboardfilterXaxis']
     dashboardClickedCategory = data['selectedCategory']
+    # position = data['charts'] # Assuming this is the same for all charts
     file_name = data['fileName']
     company_name=data['company_name']
+    # print("position====================", position) 
     print("company_name====================", company_name)
     print("file_name====================", file_name)
     conn = create_connection()
@@ -1473,6 +1512,7 @@ def save_all_chart_details():
         'company_name': company_name,
         'chart_ids': [],
         'positions': [],
+        # 'sizes': [],    
         'chart_types': [],
         'chart_Xaxes': [],
         'chart_Yaxes': [],
@@ -1490,10 +1530,14 @@ def save_all_chart_details():
 
         combined_chart_details['chart_ids'].append(chart.get(chart_id_key))
         combined_chart_details['positions'].append(chart.get('position'))
+        # combined_chart_details['sizes'].append(chart.get('size'))
         combined_chart_details['chart_types'].append(chart.get(chart_type))
         combined_chart_details['chart_Xaxes'].append(chart.get(chart_Xaxis))
         combined_chart_details['chart_Yaxes'].append(chart.get(chart_Yaxis))
         combined_chart_details['chart_aggregates'].append(chart.get(chart_aggregate))
+
+    print("combined_chart_details====================", combined_chart_details['positions'])
+
     insert_combined_chart_details(conn, combined_chart_details)
     conn.close()
     
@@ -1619,6 +1663,50 @@ def get_userdata():
     usersdata = fetch_usersdata()
     return jsonify(usersdata)
 
+# @app.route('/api/login', methods=['POST'])
+# def login():
+#     global company_name_global
+#     data = request.get_json()
+#     email = data.get('email')
+#     password = data.get('password')
+#     company = data.get('company')
+
+#     if company is not None:
+#         company_name_global = company
+
+#     print("company_name====================",company)
+#     print("email====================",email)
+#     print("password================",password)
+
+#     usersdata = None
+#     employeedata = None
+#     if company is None:
+#         usersdata = fetch_login_data(email, password)
+#     else:
+#         employeedata = fetch_company_login_data(email, password, company)
+#         print("employeedata====================",employeedata)
+
+#     if email == 'superadmin@gmail.com' and password == 'superAdmin':
+#         session_id = str(uuid.uuid4())  # Unique session ID
+#         session['session_id'] = session_id
+#         session['user_role'] = 'admin'
+#         return jsonify({'message': 'Login successful to admin page', 'session_id': session_id}), 200
+#     elif usersdata:
+#         session_id = str(uuid.uuid4())
+#         session['session_id'] = session_id
+#         session['user_id'] = usersdata # Assuming usersdata contains a user ID
+#         return jsonify({'message': 'Login successful to user page', 'session_id': session_id, 'data': usersdata}), 200
+#     elif employeedata:
+#         session_id = str(uuid.uuid4())
+#         session['session_id'] = session_id
+#         session['employee_id'] = employeedata # Assuming employeedata contains employee ID
+#         return jsonify({'message': 'Login successful to user employee page', 'session_id': session_id, 'data': employeedata}), 200
+#     else:
+#         return jsonify({'message': 'Invalid credentials'}), 401
+
+
+
+# Login Route
 @app.route('/api/login', methods=['POST'])
 def login():
     global company_name_global
@@ -1630,35 +1718,95 @@ def login():
     if company is not None:
         company_name_global = company
 
-    print("company_name====================",company)
-    print("email====================",email)
-    print("password================",password)
+    usersdata = None
+    employeedata = None
+    if company is None:
+        usersdata = fetch_login_data(email, password)  # Function to validate user credentials
+    else:
+        employeedata = fetch_company_login_data(email, password, company)
+        print("employeedata====================",employeedata)  
+
+    if email == 'superadmin@gmail.com' and password == 'superAdmin':
+        token = generate_jwt_token('superadmin', 'admin')
+        return jsonify({'message': 'Login successful to admin page', 'token': token}), 200
+    elif usersdata:
+        token = generate_jwt_token(usersdata['user_id'], 'user')
+        return jsonify({'message': 'Login successful to user page', 'token': token, 'data': usersdata}), 200
+    elif employeedata:
+        employee_id = employeedata['user'][0]
+        token = generate_jwt_token(employee_id, 'employee')
+        return jsonify({'message': 'Login successful to user employee page', 'token': token, 'data': employeedata}), 200
+    else:
+        return jsonify({'message': 'Invalid credentials'}), 401
+
+
+# Login Route
+@app.route('/inlogin', methods=['POST'])
+def inlogin():
+    global company_name_global
+    data = request.get_json()
+    email = data.get('username')
+    password = data.get('password')
+    company = data.get('company')
+
+    if company is not None:
+        company_name_global = company
 
     usersdata = None
     employeedata = None
     if company is None:
-        usersdata = fetch_login_data(email, password)
+        usersdata = fetch_login_data(email, password)  # Function to validate user credentials
     else:
         employeedata = fetch_company_login_data(email, password, company)
-        print("employeedata====================",employeedata)
+        print("employeedata====================",employeedata)  
 
     if email == 'superadmin@gmail.com' and password == 'superAdmin':
-        session_id = str(uuid.uuid4())  # Unique session ID
-        session['session_id'] = session_id
-        session['user_role'] = 'admin'
-        return jsonify({'message': 'Login successful to admin page', 'session_id': session_id}), 200
+        token = generate_jwt_token('superadmin', 'admin')
+        return jsonify({'message': 'Login successful to admin page', 'token': token}), 200
     elif usersdata:
-        session_id = str(uuid.uuid4())
-        session['session_id'] = session_id
-        session['user_id'] = usersdata # Assuming usersdata contains a user ID
-        return jsonify({'message': 'Login successful to user page', 'session_id': session_id, 'data': usersdata}), 200
+        token = generate_jwt_token(usersdata['user_id'], 'user')
+        return jsonify({'message': 'Login successful to user page', 'token': token, 'data': usersdata}), 200
     elif employeedata:
-        session_id = str(uuid.uuid4())
-        session['session_id'] = session_id
-        session['employee_id'] = employeedata # Assuming employeedata contains employee ID
-        return jsonify({'message': 'Login successful to user employee page', 'session_id': session_id, 'data': employeedata}), 200
+        employee_id = employeedata['user'][0]
+        token = generate_jwt_token(employee_id, 'employee')
+        return jsonify({'message': 'Login successful to user employee page', 'token': token, 'data': employeedata}), 200
     else:
         return jsonify({'message': 'Invalid credentials'}), 401
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Example of a protected route
+@app.route('/api/protected', methods=['GET'])
+@token_required
+def protected():
+    return jsonify({'message': 'This is a protected route!'})
+
+
+
+
+
+
+
+
+
 
 # @app.route('/api/singlevalue_text_chart', methods=['POST'])
 # def receive_single_value_chart_data():
@@ -2173,10 +2321,13 @@ def dashboard_data(dashboard_name):
     print("chart datas------------------------------------------------------------------------------------------------------------------",data) 
     if data is not None:
         chart_ids = data[4]
+        position = data[5]
         print("chart_ids====================",chart_ids)    
         chart_datas=get_dashboard_view_chart_data(chart_ids)
         # print("chart_datas====================",chart_datas)
         # return jsonify(data,chart_datas)
+        print("chart_datas====================",chart_datas)
+        print("data====================",data)
         return jsonify({
             "data": data,
             "chart_datas": chart_datas
@@ -2887,5 +3038,32 @@ def api_get_table_columns(table_name):
 if __name__ == "__main__":
     # Use socketio.run to enable WebSocket support
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
