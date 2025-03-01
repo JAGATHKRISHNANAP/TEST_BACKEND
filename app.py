@@ -1512,7 +1512,7 @@ def save_all_chart_details():
         'company_name': company_name,
         'chart_ids': [],
         'positions': [],
-        # 'sizes': [],    
+        'chart_sizes': [],    
         'chart_types': [],
         'chart_Xaxes': [],
         'chart_Yaxes': [],
@@ -1530,13 +1530,14 @@ def save_all_chart_details():
 
         combined_chart_details['chart_ids'].append(chart.get(chart_id_key))
         combined_chart_details['positions'].append(chart.get('position'))
-        # combined_chart_details['sizes'].append(chart.get('size'))
+        combined_chart_details['chart_sizes'].append(chart.get('size'))
         combined_chart_details['chart_types'].append(chart.get(chart_type))
         combined_chart_details['chart_Xaxes'].append(chart.get(chart_Xaxis))
         combined_chart_details['chart_Yaxes'].append(chart.get(chart_Yaxis))
         combined_chart_details['chart_aggregates'].append(chart.get(chart_aggregate))
 
-    print("combined_chart_details====================", combined_chart_details['positions'])
+    # print("combined_chart_details====================", combined_chart_details['positions'])
+    # print("combined_chart_details====================", combined_chart_details['chart_sizes'])
 
     insert_combined_chart_details(conn, combined_chart_details)
     conn.close()

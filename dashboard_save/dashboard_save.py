@@ -30,6 +30,7 @@ def create_dashboard_table(conn):
         file_name VARCHAR(255), 
         chart_ids VARCHAR(255),
         position VARCHAR(255),
+        chart_size VARCHAR(255),    
         chart_type VARCHAR(255),
         chart_Xaxis VARCHAR(255),
         chart_Yaxis VARCHAR(255),
@@ -50,8 +51,8 @@ def create_dashboard_table(conn):
 def insert_combined_chart_details(conn, combined_chart_details):
     insert_query = """
     INSERT INTO dashboard_details_WU_ID 
-    (user_id,company_name,file_name, chart_ids, position, chart_type, chart_Xaxis, chart_Yaxis, chart_aggregate, filterdata, clicked_category)
-    VALUES (%s,%s,%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    (user_id,company_name,file_name, chart_ids, position,chart_size, chart_type, chart_Xaxis, chart_Yaxis, chart_aggregate, filterdata, clicked_category)
+    VALUES (%s,%s,%s, %s, %s,%s, %s, %s, %s, %s, %s, %s)
     """
     
     try:
@@ -62,6 +63,7 @@ def insert_combined_chart_details(conn, combined_chart_details):
             combined_chart_details['file_name'],
             combined_chart_details['chart_ids'], 
             str(combined_chart_details['positions']), 
+            str(combined_chart_details['chart_sizes']),
             str(combined_chart_details['chart_types']),
             str(combined_chart_details['chart_Xaxes']), 
             str(combined_chart_details['chart_Yaxes']), 
